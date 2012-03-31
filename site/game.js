@@ -474,7 +474,7 @@
         this.generateFluff();
     },
     generateFluff: function() {
-      var size = Math.random() * 30 + 30;
+      var size = Math.random() * 10 + 10;
       var speed = this.generateSpeed();
       var type = this.generateType();
       var fluff = new Fluff(speed, size, type);
@@ -520,7 +520,7 @@
       this.raise('Moved');
     },
     canAttract: function(other) {
-      return other.distanceFrom(this) < 150;
+      return other.distanceFrom(this) < 100;
     }
   };
   _.extend(Plughole.prototype, Quad.prototype);
