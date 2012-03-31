@@ -14,7 +14,7 @@ var server = http.createServer(function(req, res) {
       res.end("Error 404: File not found");
     });    
 });
-server.listen(8000);
+server.listen(process.env.PORT || 8000);
 
 swallow.build({
   in: './assets',
