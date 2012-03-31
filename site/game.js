@@ -241,7 +241,16 @@
       if(this.effect)
         this.effect.update();
       if(!this.visible) return;
+      if(this.colour instanceof Image)
+        this.renderTexture(context);
+      else
+        this.renderColour(context);
 
+    },
+    renderTexture: function(context) {
+      context.drawImage(this.colour, this.x, this.y, this.width, this.height);
+    },
+    renderColour: function(context) {
       context.fillStyle = this.colour;
       context.fillRect(this.x, this.y, this.width, this.height);
     },
