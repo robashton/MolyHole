@@ -211,6 +211,25 @@
   };
   _.extend(ResizeWaterfallEffect.prototype, Effect.prototype);
 
+  var WaterfallAnimationEffect = function(quad) {
+    Effect.call(this);
+    this.quad = quad;
+    this.frame = 1;
+    this.maxFrames = 3;
+  };
+  WaterfallAnimationEffect.prototype = {
+    update: function() {
+      this.nextFrame();
+    },
+    nextFrame: function() {
+      this.frame += 1;
+      if(this.frame > this.maxFrames)
+        this.frame = 1;
+      this.quad.colour = GlobalResources.getTexture('assets/waterfall/' + this.frame + '.png');
+    }
+  };
+  _.extend(WaterfallAnimationEffect.prototype, Effect.prototype);
+
   var Scene = function() {
     Eventable.call(this);
     this.entities = {};
@@ -273,7 +292,7 @@
     this.height = height;
     this.x = 0;
     this.y = 0;
-    this.effect = null;
+    this.effects = [];
     this.colour = colour || '#000';
     this.physical = false;
     this.visible = true;
@@ -282,8 +301,7 @@
 
   Quad.prototype = {
     render: function(context) {
-      if(this.effect)
-        this.effect.update();
+      this.runEffects();
       if(!this.visible) return;
 
       context.globalAlpha = this.alpha;
@@ -300,18 +318,22 @@
       context.fillStyle = this.colour;
       context.fillRect(this.x, this.y, this.width, this.height);
     },
-    setEffect: function(effect) {
-      if(this.effect)
-        this.removeEffect();
-      this.effect = effect;
-      this.effect.on('Finished', this.removeEffect, this);
+    runEffects: function() {
+      for(var i = 0; i < this.effects.length; i++){
+        this.effects[i].update();
+      }
     },
-    removeEffect: function() {
-      if(this.effect) {
-        this.effect.off('Finished', this.removeEffect, this);
-        this.effect = null;  
-      }      
+    addEffect: function(effect) {
+      this.effects.push(effect);
+      effect.on('Finished', this.onEffectFinished, this);
     },
+    removeEffect: function(effect) {
+      effect.off('Finished', this.onEffectFinished, this); 
+      this.effects = _(this.effects).without(effect);
+    },
+    onEffectFinished: function(data, sender) {
+      this.removeEffect(sender);
+    },   
     hitTest: function(x, y) {
       if(!this.physical) return false;
       if(x < this.x) return false;
@@ -394,7 +416,7 @@
         this.switchToSelectedStrategy();
       }
       else if(this.hasTouchedFloor())
-        this.switchToFailedStrategy();
+        this.switchToExpiredStrategy();
     },
     isNearPlughole: function() {
       if(this.y + this.size < CANVASHEIGHT / 3.0)
@@ -418,9 +440,8 @@
         this.switchToSelectedStrategy();
       }
     },
-    switchToFailedStrategy: function() {
-      this.raise('FluffFailure');
-      this.setEffect(new FadeOutEffect(this, Fluff.FadeTime));
+    switchToExpiredStrategy: function() {
+      this.addEffect(new FadeOutEffect(this, Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
     switchToSelectedStrategy: function() {
@@ -429,7 +450,12 @@
     },
     switchToSuccessStrategy: function() {
       this.raise('FluffSuccess');
-      this.setEffect(new FadeOutEffect(this, Fluff.FadeTime));
+      this.addEffect(new FadeOutEffect(this, Fluff.FadeTime));
+      this.currentStrategy = this.expireStrategy;
+    },
+    switchToFailedStrategy: function() {
+      this.raise('FluffFailure');
+      this.addEffect(new FadeOutEffect(this, Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
     expireStrategy: function() {
@@ -439,10 +465,15 @@
     },
     attractedStrategy: function() {
       this.scene.withEntity('plughole', _.bind(function(plughole) {
-        if(this.intersects(plughole))
-          this.switchToSuccessStrategy();
-        else
+        if(this.intersects(plughole)) {
+          if(this.type === Fluff.Type.BAD)
+            this.switchToFailedStrategy();
+          else
+            this.switchToSuccessStrategy();
+        }
+        else {
           this.moveTowards(plughole);
+        }
       }, this));
     },
     moveTowards: function(target) {
@@ -474,7 +505,7 @@
         this.generateFluff();
     },
     generateFluff: function() {
-      var size = Math.random() * 30 + 30;
+      var size = Math.random() * 10 + 10;
       var speed = this.generateSpeed();
       var type = this.generateType();
       var fluff = new Fluff(speed, size, type);
@@ -520,7 +551,10 @@
       this.raise('Moved');
     },
     canAttract: function(other) {
-      return other.distanceFrom(this) < 150;
+      if(other.distanceFrom(this) > 100) return false;
+      if(other.x + other.width < this.x) return false;
+      if(other.x > this.x + this.width) return false;
+      return true;
     }
   };
   _.extend(Plughole.prototype, Quad.prototype);
@@ -539,6 +573,7 @@
     this.id = "waterfall";
     this.fluffGoal = fluffGoal;
     this.currentFluff = 0;
+    this.addEffect(new WaterfallAnimationEffect(this));
   };
   Waterfall.prototype = {
     onAddedToScene: function() {
@@ -564,7 +599,7 @@
     },
     resize: function() {
       var newWidth = this.calculateDesiredWidth();
-      this.setEffect(new ResizeWaterfallEffect(this, newWidth, 20));
+      this.addEffect(new ResizeWaterfallEffect(this, newWidth, 20));
     },
     calculateDesiredWidth: function() {
       var width = 0;
@@ -725,7 +760,7 @@
     tick: function() {
       this.scene.withEntity("plughole", _.bind(function(plughole) {
         this.x = plughole.x + (plughole.width - this.width) / 2.0;
-        this.y = plughole.y;   
+        this.y = plughole.y - (this.height / 2.0);
       }, this));
     },
     clampCount: function() {
@@ -736,7 +771,7 @@
     },
     resize: function() {
      this.clampCount();
-     this.setEffect(new FadeInAndOutEffect(this, 20));
+     this.addEffect(new FadeInAndOutEffect(this, 20));
      if(this.count <= 0) {
        this.visible = false;
      }
