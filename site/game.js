@@ -155,20 +155,38 @@
   };
   _.extend(Effect.prototype, Eventable.prototype);
 
-  var FadeEffect = function(quad, frames) {
+  var FadeOutEffect = function(quad, frames) {
     Effect.call(this);
 
     this.frames = frames;
     this.quad = quad;
     this.frameCount = 0;
   };
-  FadeEffect.prototype = {
+  FadeOutEffect.prototype = {
     update: function() {
       this.frameCount++;
       this.quad.alpha = Math.max(1.0 - (this.frameCount / this.frames), 0.0);
     }
   };
-  _.extend(FadeEffect.prototype, Effect.prototype);
+  _.extend(FadeOutEffect.prototype, Effect.prototype);
+
+  var FadeInAndOutEffect = function(quad, frames) {
+    Effect.call(this);
+    this.quad = quad;
+    this.frames = frames;
+    this.frameCount = 0;
+  };
+  FadeInAndOutEffect.prototype = {
+    update: function() {
+      this.frameCount++;
+      var percentage = this.frameCount / this.frames;
+      if(percentage > 0.5) 
+        this.quad.alpha = Math.max((percentage - 0.5) * 2.0, 0.0);
+      else
+        this.quad.alpha = Math.max((0.5 - percentage) * 2.0, 0.0);
+    }
+  };
+  _.extend(FadeInAndOutEffect.prototype, Effect.prototype);
 
   var Scene = function() {
     Eventable.call(this);
@@ -375,7 +393,7 @@
     },
     switchToFailedStrategy: function() {
       this.raise('FluffFailure');
-      this.setEffect(new FadeEffect(this, Fluff.FadeTime));
+      this.setEffect(new FadeOutEffect(this, Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
     switchToSelectedStrategy: function() {
@@ -384,7 +402,7 @@
     },
     switchToSuccessStrategy: function() {
       this.raise('FluffSuccess');
-      this.setEffect(new FadeEffect(this, Fluff.FadeTime));
+      this.setEffect(new FadeOutEffect(this, Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
     expireStrategy: function() {
@@ -582,7 +600,7 @@
       }, this));
     },
     resize: function() {
-      console.log(this.count);
+     this.setEffect(new FadeInAndOutEffect(this, 20));
      if(this.count <= 0) {
        this.visible = false;
      }
@@ -593,7 +611,6 @@
           this.width = plughole.width * percentage;
           this.height = plughole.height * percentage;
        }, this));
-       console.log(this.x, this.y, this.width, this.height);
      } 
     }
   }
