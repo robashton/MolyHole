@@ -672,21 +672,21 @@
     },
     onTouchStart: function(e) {
       if(!e) var e = event;
-      e.preventDefaults();
+      e.preventDefault();
       var touch = e.touches[0];
       var coords = this.pageToCanvas(touch.pageX, touch.pageY);
       actionOn(coords.x, coords.y);
     },
     onTouchMove: function(e) {
       if(!e) var e = event;
-      e.preventDefaults();
+      e.preventDefault();
       var touch = e.touches[0];
       var coords = this.pageToCanvas(touch.pageX, touch.pageY);
       actionOn(coords.x, coords.y);
     },
     onTouchEnd: function(e) {
       if(!e) var e = event;
-      e.preventDefaults();
+      e.preventDefault();
     },
     actionOn: function(x, y) {
       this.scene.withEntity("plughole", function(entity) {
