@@ -1,6 +1,7 @@
 (function(exports) {
   var CANVASWIDTH = 800;
   var CANVASHEIGHT = 800;
+  var CAPTUREDFLUFFSPEED = 10.0;
 
   var EventContainer = function(defaultContext) {
     this.handlers = [];
@@ -164,6 +165,13 @@
           return true;
         }
       });
+    },
+    withEntity: function(id, cb) {
+      var entity = this.entities[id];
+      if(!entity)
+        console.warn("Missing entity", id);
+      else
+        cb(entity);
     }
   };
   _.extend(Scene.prototype, Eventable.prototype);
@@ -198,6 +206,26 @@
       if(y < this.y) return false;
       if(y > this.y + this.height) return false;
       return true;
+    },
+    intersects: function(other) {
+      if(other.x + other.width < this.x)
+        return false;
+      if(other.x > this.x + this.width)
+        return false;
+      if(other.y + other.height < this.y)
+        return false;
+      if(other.y > this.y + this.height)
+        return false;
+      return true;
+    },
+    directionTo: function(other) {
+      var dx = other.x - this.x;
+      var dy = other.y - this.y;
+      var mag = Math.sqrt((dx * dx) + (dy * dy));
+      return {
+        x: dx / mag,
+        y: dy / mag
+      };
     }
   };
 
@@ -214,7 +242,7 @@
     this.id = 'fluff-' + Math.random() * 100000;
     this.generateNewBounds();
     this.currentStrategy = this.driftStrategy;
-    this.failedTime = 0;
+    this.expireTime = 0;
   };
 
   Fluff.prototype = {
@@ -249,19 +277,34 @@
     switchToFailedStrategy: function() {
       this.raise('FluffFailure');
       this.setEffect(new FadeEffect(30));
-      this.currentStrategy = this.failedStrategy;
+      this.currentStrategy = this.expireStrategy;
     },
     switchToSelectedStrategy: function() {
       this.raise('FluffSelected');
       this.currentStrategy = this.selectedStrategy;
     },
-    failedStrategy: function() {
-      this.failedTime++;
-      if(this.failedTime > 30)
+    switchToSuccessStrategy: function() {
+      this.raise('FluffSuccess');
+      this.setEffect(new FadeEffect(30));
+      this.currentStrategy = this.expireStrategy;
+    },
+    expireStrategy: function() {
+      this.expireTime++;
+      if(this.expireTime > 30)
         this.scene.remove(this);
     },
     selectedStrategy: function() {
-
+      this.scene.withEntity('plughole', _.bind(function(plughole) {
+        if(this.intersects(plughole))
+          this.switchToSuccessStrategy();
+        else
+          this.moveTowards(plughole);
+      }, this));
+    },
+    moveTowards: function(target) {
+      var direction = this.directionTo(target);
+      this.x += direction.x * CAPTUREDFLUFFSPEED;
+      this.y += direction.y * CAPTUREDFLUFFSPEED;
     }
   };
   _.extend(Fluff.prototype, Quad.prototype, Eventable.prototype);
@@ -270,7 +313,7 @@
     Eventable.call(this);
     this.scene = null;
     this.id = "fluffgenerator";
-    this.rate = 2000;
+    this.rate = 60;
     this.frame = 0;
     this.difficulty = 0.5;
   };
