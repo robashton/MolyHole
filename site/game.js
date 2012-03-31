@@ -394,7 +394,7 @@
         this.switchToSelectedStrategy();
       }
       else if(this.hasTouchedFloor())
-        this.switchToFailedStrategy();
+        this.switchToExpiredStrategy();
     },
     isNearPlughole: function() {
       if(this.y + this.size < CANVASHEIGHT / 3.0)
@@ -418,8 +418,7 @@
         this.switchToSelectedStrategy();
       }
     },
-    switchToFailedStrategy: function() {
-      this.raise('FluffFailure');
+    switchToExpiredStrategy: function() {
       this.setEffect(new FadeOutEffect(this, Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
@@ -432,6 +431,11 @@
       this.setEffect(new FadeOutEffect(this, Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
+    switchToFailedStrategy: function() {
+      this.raise('FluffFailure');
+      this.setEffect(new FadeOutEffect(this, Fluff.FadeTime));
+      this.currentStrategy = this.expireStrategy;
+    },
     expireStrategy: function() {
       this.expireTime++;
       if(this.expireTime > Fluff.FadeTime)
@@ -439,10 +443,15 @@
     },
     attractedStrategy: function() {
       this.scene.withEntity('plughole', _.bind(function(plughole) {
-        if(this.intersects(plughole))
-          this.switchToSuccessStrategy();
-        else
+        if(this.intersects(plughole)) {
+          if(this.type === Fluff.Type.BAD)
+            this.switchToFailedStrategy();
+          else
+            this.switchToSuccessStrategy();
+        }
+        else {
           this.moveTowards(plughole);
+        }
       }, this));
     },
     moveTowards: function(target) {
