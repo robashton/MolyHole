@@ -661,9 +661,9 @@
     this.wrappedElement.on({
       click: _.bind(this.onClick, this)
     });
-    this.element.addEventListener('touchstart', _.bind(this.onTouchStart, this), true);
-    this.element.addEventListener('touchmove', _.bind(this.onTouchMove, this), true);
-    this.element.addEventListener('touchend', _.bind(this.onTouchEnd, this), true);
+    document.addEventListener('touchstart', _.bind(this.onTouchStart, this), true);
+    document.addEventListener('touchmove', _.bind(this.onTouchMove, this), true);
+    document.addEventListener('touchend', _.bind(this.onTouchEnd, this), true);
   };
 
   Input.prototype = {
