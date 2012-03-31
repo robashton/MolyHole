@@ -310,7 +310,7 @@
     },
     switchToFailedStrategy: function() {
       this.raise('FluffFailure');
-      this.setEffect(new FadeEffect(30));
+      this.setEffect(new FadeEffect(Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
     switchToSelectedStrategy: function() {
@@ -319,12 +319,12 @@
     },
     switchToSuccessStrategy: function() {
       this.raise('FluffSuccess');
-      this.setEffect(new FadeEffect(30));
+      this.setEffect(new FadeEffect(Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
     expireStrategy: function() {
       this.expireTime++;
-      if(this.expireTime > 30)
+      if(this.expireTime > Fluff.FadeTime)
         this.scene.remove(this);
     },
     attractedStrategy: function() {
@@ -341,6 +341,7 @@
       this.y += direction.y * CAPTUREDFLUFFSPEED;
     }
   };
+  Fluff.FadeTime = 10;
   Fluff.Type = {
     GOOD: 0,
     BAD: 1
@@ -494,22 +495,33 @@
     this.scene = new Scene();
     this.renderer = new Renderer('game');
     this.input = new Input('game', this.scene);
+    this.createEntities();
   };
 
   Game.prototype = {
+    createEntities: function() {
+      this.fluffgenerator = new FluffGenerator(this.scene);
+      this.bathtub = new BathTub();
+      this.waterfall = new Waterfall();
+      this.plughole = new Plughole();
+      this.spider = new Spider();
+    },
     start: function() {
-      this.scene.add(new FluffGenerator(this.scene));
-      this.scene.add(new Bathtub());
-      this.scene.add(new Waterfall());
-      this.scene.add(new Plughole());
-      this.scene.add(new Spider());
+      this.scene.add(this.fluffgenerator);
+      this.scene.add(this.bathtub);
+      this.scene.add(this.waterfall);
+      this.scene.add(this.plughole);
+      this.scene.add(this.spider);
+      this.scene.autoHook(this);
+      this.startTimers();      
+    },
+    startTimers: function() {
       var self = this;
       setInterval(function() {
         self.tick();
       }, 1000 / 30);
     },
     tick: function() {
-
       // TODO: Decouple, use reqanimationframe
       this.scene.tick();
       this.renderer.clear();
