@@ -218,6 +218,7 @@
 
   Scene.prototype = {
     add: function(entity) {
+      if(!entity.id) throw "Tried adding entity with no id";
       this.entities[entity.id] = entity;
       entity.scene = this;
       entity.onAny(this.onEntityEvent, this);
@@ -630,17 +631,16 @@
   _.extend(FloorWater.prototype, Quad.prototype);
 
   var Spider = function() {
-    Quad.call(this, 60, 60);
-    Eventable.call(this);
-    this.x = 370;
-    this.y = 740;
+    Quad.call(this, 60, 60, GlobalResources.getTexture('assets/Spider 1.png'));
+    this.x = 730;
+    this.y = 640;
     this.id = "spider";
   };
 
   Spider.prototype = {
 
   };
-  _.extend(Spider.prototype, Eventable.prototype);
+  _.extend(Spider.prototype, Quad.prototype);
 
   var Renderer = function(id) {
     this.canvas = document.getElementById(id);
@@ -676,7 +676,7 @@
 
   var CollectedFluff = function(maxCount) {
     Quad.call(this, 0, 0);
-
+    this.id = "collectedfluff";
     this.visible = false;
     this.count = 0;
     this.maxCount = maxCount;
@@ -747,9 +747,9 @@
       this.scene.add(this.fluffgenerator);
       this.scene.add(this.bathtub);
       this.scene.add(this.plughole);
-      this.scene.add(this.spider);
       this.scene.add(this.collectedfluff);
       this.scene.add(this.floor);
+      this.scene.add(this.spider);
       this.scene.add(this.waterfall);
       this.scene.add(this.floorWater);
       this.scene.autoHook(this);
