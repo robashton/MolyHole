@@ -123,6 +123,64 @@
     }
   };
 
+  var FluffGenerator = function(scene) {
+    this.scene = scene;
+    this.id = "fluffgenerator";
+  };
+  FluffGenerator.prototype = {
+
+  };
+
+  var Quad = function(width, height)
+    this.width = width;
+    this.height = height;
+    this.x = 0;
+    this.y = 0;
+  };
+  Quad.prototype = {
+    render: function(context) {
+      context.fillStyle = '#000';
+      context.fillRect(this.x, this.y, this.width, this.height);
+    }
+  };
+
+  var Fluff = function(speed, width, height) {
+    Quad.call(this, width, height);
+    this.speed = 0;
+    this.x = Math.random() * 800;
+    this.y = 0;
+    this.id = 'fluff-' + Math.random() * 100000;
+  };
+
+  Fluff.prototype = function() {
+    tick: function() {
+      this.y += this.speed;
+    }
+  };
+  _.extend(Fluff.prototype, Quad.prototype);
+
+  var Plughole = function() {
+    Quad.call(this, 120, 40);
+    this.x = 340;
+    this.y = 380;
+    this.id = "plughole";
+  };
+
+  Plughole.prototype = {
+
+  };
+  _.extend(Plughole.prototype, Quad.prototype);
+
+  var Spider = function() {
+    Quad.call(this, 60, 60);
+    this.x = 370;
+    this.y = 740;
+    this.id = "spider";
+  };
+
+  Spider.prototype = {
+
+  };
 
   var Game = function() {
     this.scene = new Scene();
@@ -131,22 +189,11 @@
 
   Game.prototype = function() {
     start: function() {
-      this.scene.add(new FluffGenerator());
-
+      this.scene.add(new FluffGenerator(this.scene));
+      this.scene.add(new Plughole());
+      this.scene.add(new Spider());
     }
   };
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
