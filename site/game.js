@@ -176,19 +176,21 @@
   };
   _.extend(Scene.prototype, Eventable.prototype);
 
-  var Quad = function(width, height) {
+  var Quad = function(width, height, colour) {
     this.width = width;
     this.height = height;
     this.x = 0;
     this.y = 0;
     this.effect = null;
+    this.colour = colour || '#000';
+    this.physical = false;
   };
 
   Quad.prototype = {
     render: function(context) {
       if(this.effect)
         this.effect.update();
-      context.fillStyle = '#000';
+      context.fillStyle = this.colour;
       context.fillRect(this.x, this.y, this.width, this.height);
     },
     setEffect: function(effect) {
@@ -201,6 +203,7 @@
       this.effect = null;
     },
     hitTest: function(x, y) {
+      if(!this.physical) return false;
       if(x < this.x) return false;
       if(x > this.x + this.width) return false;
       if(y < this.y) return false;
@@ -238,6 +241,7 @@
 
     this.x = 0;
     this.y = 0;
+    this.physical = true;
     this.direction = 1;
     this.id = 'fluff-' + Math.random() * 100000;
     this.generateNewBounds();
@@ -346,6 +350,30 @@
   };
   _.extend(Plughole.prototype, Quad.prototype, Eventable.prototype);
 
+  var Bathtub = function() {
+    Quad.call(this, CANVASWIDTH, CANVASHEIGHT / 2.0, '#00F');
+    Eventable.call(this);
+    this.id = "bathtub";
+  };
+  Bathtub.prototype = {
+
+  };
+  _.extend(Bathtub.prototype, Quad.prototype, Eventable.prototype);
+
+  var Waterfall = function() {
+    Quad.call(this, 80, CANVASHEIGHT / 2.0, '#00F');
+    Eventable.call(this);
+    this.id = "waterfall";
+    this.calculateDimensions();
+  };
+  Waterfall.prototype = {
+    calculateDimensions: function() {
+      this.x = (CANVASWIDTH / 2.0) - this.width / 2.0;
+      this.y = CANVASHEIGHT / 2.0;
+    }
+  };
+  _.extend(Waterfall.prototype, Quad.prototype, Eventable.prototype)
+
   var Spider = function() {
     Quad.call(this, 60, 60);
     Eventable.call(this);
@@ -366,7 +394,7 @@
 
   Renderer.prototype = {
     clear: function() {
-      this.context.fillStyle = '#55F';
+      this.context.fillStyle = '#F0F';
       this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
   };
@@ -401,6 +429,8 @@
   Game.prototype = {
     start: function() {
       this.scene.add(new FluffGenerator(this.scene));
+      this.scene.add(new Bathtub());
+      this.scene.add(new Waterfall());
       this.scene.add(new Plughole());
       this.scene.add(new Spider());
       var self = this;
