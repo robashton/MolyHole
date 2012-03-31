@@ -102,6 +102,51 @@
     }
   };
 
+  var Resources = function() {
+    Eventable.call(this);
+    this.packages = [];
+    this.cachedResources = {};
+  };
+  Resources.prototype = {
+    load: function(file, cb) {
+      var self = this;  
+      $.getJSON(file, function(data) {
+        self.packages.push(data);
+        cb();
+      })
+    },
+    getTexture: function(path) {
+      var texture = this.fromCacheOrCreate(path, function(data) {
+        var image = new Image();
+        image.src = "data:image/png;base64," + data;
+        return image;
+      });
+      if(!texture)
+        console.warn('Missing texture', path);
+      return texture;
+    },
+    fromCacheOrCreate: function(path, createCallback) {
+      var item = this.cachedResources[path];
+      if(item) return item;
+      var data = this.findData(path);
+      if(data) {
+        item = createCallback(data);
+        this.cachedResources[path] = item;
+      } 
+      return item;
+    },
+    findData: function(path) {
+      for(var i = 0; i < this.packages.length; i++) {
+        var package = this.packages[i];
+        var data = package[path];
+        if(data) return data;
+      }
+      return null;
+    }
+  };
+  _.extend(Resources.prototype, Eventable.prototype);
+  var GlobalResources = new Resources();
+
   var Effect = function() {
     Eventable.call(this);
   };
@@ -134,10 +179,13 @@
       this.entities[entity.id] = entity;
       entity.scene = this;
       entity.onAny(this.onEntityEvent, this);
+      if(entity.onAddedToScene) entity.onAddedToScene();
     },
     remove: function(entity) {
       delete this.entities[entity.id];
       entity.offAny(this.onEntityEvent, this);
+      if(entity.onRemovedFromScene) entity.onRemovedFromScene();
+      entity.scene = null;
     },
     render: function(context) {
       this.each(function(entity) {
@@ -177,6 +225,7 @@
   _.extend(Scene.prototype, Eventable.prototype);
 
   var Quad = function(width, height, colour) {
+    Eventable.call(this);
     this.width = width;
     this.height = height;
     this.x = 0;
@@ -184,12 +233,15 @@
     this.effect = null;
     this.colour = colour || '#000';
     this.physical = false;
+    this.visible = true;
   };
 
   Quad.prototype = {
     render: function(context) {
       if(this.effect)
         this.effect.update();
+      if(!this.visible) return;
+
       context.fillStyle = this.colour;
       context.fillRect(this.x, this.y, this.width, this.height);
     },
@@ -240,10 +292,10 @@
       };
     }
   };
+  _.extend(Quad.prototype, Eventable.prototype);
 
   var Fluff = function(speed, size, type) {
     Quad.call(this, size, size);
-    Eventable.call(this);
 
     this.speed = speed;
     this.size = size;
@@ -346,10 +398,11 @@
     GOOD: 0,
     BAD: 1
   };
-  _.extend(Fluff.prototype, Quad.prototype, Eventable.prototype);
+  _.extend(Fluff.prototype, Quad.prototype);
 
   var FluffGenerator = function() {
     Eventable.call(this);
+
     this.scene = null;
     this.id = "fluffgenerator";
     this.rate = 180;
@@ -386,7 +439,7 @@
     Eventable.call(this);
 
     this.x = 360;
-    this.y = 390;
+    this.y = CANVASHEIGHT / 2.0;
     this.destx = CANVASWIDTH / 2.0;
     this.speed = 10.0;
     this.id = "plughole";
@@ -408,21 +461,19 @@
       return other.distanceFrom(this) < 150;
     }
   };
-  _.extend(Plughole.prototype, Quad.prototype, Eventable.prototype);
+  _.extend(Plughole.prototype, Quad.prototype);
 
   var Bathtub = function() {
     Quad.call(this, CANVASWIDTH, CANVASHEIGHT / 2.0, '#00F');
-    Eventable.call(this);
     this.id = "bathtub";
   };
   Bathtub.prototype = {
 
   };
-  _.extend(Bathtub.prototype, Quad.prototype, Eventable.prototype);
+  _.extend(Bathtub.prototype, Quad.prototype);
 
   var Waterfall = function() {
     Quad.call(this, 80, CANVASHEIGHT / 2.0, '#00F');
-    Eventable.call(this);
     this.id = "waterfall";
     this.lastx = -1;
   };
@@ -434,7 +485,7 @@
     updatePositionWith: function(plughole) {
       var middleOfPlughole = (plughole.x + plughole.width / 2.0); 
       this.x = middleOfPlughole - (this.width / 2.0);
-      this.y = CANVASHEIGHT / 2.0;
+      this.y = CANVASHEIGHT / 2.0 + plughole.height;
       this.lastx = plughole.x;
     },
     tick: function() {
@@ -491,6 +542,42 @@
     }
   };
 
+  var CollectedFluff = function(maxCount) {
+    Quad.call(this, 0, 0);
+  
+    this.visible = false;
+    this.count = 0;
+    this.maxCount = maxCount;
+  };
+  CollectedFluff.prototype = {
+    onAddedToScene: function(){
+      this.scene.on('FluffSuccess', this.onFluffSuccess, this);
+      this.scene.on('FluffFailure', this.onFluffFailure, this);
+    },
+    onFluffSuccess: function() {
+      this.count++;
+      this.resize();
+    },
+    onFluffFailure: function() {
+      this.count--;
+      this.resize();
+    },
+    resize: function() {
+     if(this.count <= 0) {
+       this.visible = false;
+     }
+     else {
+       this.visible = true;
+       var percentage = this.maxCount / this.count;
+       this.scene.withEntity("plughole", _.bind(function(plughole) {
+          this.width = plughole.width * percentage;
+          this.height = plughole.height * percentage;
+       }, this));
+     } 
+    }
+  }
+  _.extend(CollectedFluff.prototype, Quad.prototype);
+
   var Game = function() {
     this.scene = new Scene();
     this.renderer = new Renderer('game');
@@ -501,17 +588,19 @@
   Game.prototype = {
     createEntities: function() {
       this.fluffgenerator = new FluffGenerator(this.scene);
-      this.bathtub = new BathTub();
+      this.bathtub = new Bathtub();
       this.waterfall = new Waterfall();
       this.plughole = new Plughole();
       this.spider = new Spider();
+      this.collectedfluff = new CollectedFluff();
     },
     start: function() {
       this.scene.add(this.fluffgenerator);
       this.scene.add(this.bathtub);
-      this.scene.add(this.waterfall);
       this.scene.add(this.plughole);
+      this.scene.add(this.waterfall);
       this.scene.add(this.spider);
+      this.scene.add(this.collectedfluff);
       this.scene.autoHook(this);
       this.startTimers();      
     },
@@ -530,8 +619,9 @@
   };
 
   $(document).ready(function(){
-    var game = new Game();
-    game.start();
+    GlobalResources.load('assets.json', function() {
+      var game = new Game();
+      game.start();
+    });
   });
-  
 })();

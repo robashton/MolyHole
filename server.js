@@ -1,6 +1,7 @@
 var paperboy = require('paperboy');
 var http = require('http');
 var path = require('path');
+var swallow = require('swallow');
 
 WEBROOT = path.join(path.dirname(__filename), 'site');
 
@@ -14,3 +15,10 @@ var server = http.createServer(function(req, res) {
     });    
 });
 server.listen(8000);
+
+swallow.build({
+  in: './assets',
+  out: './site/assets.json'
+}, function() {
+  console.log('Built assets');
+});
