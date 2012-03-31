@@ -166,6 +166,8 @@
     update: function() {
       this.frameCount++;
       this.quad.alpha = Math.max(1.0 - (this.frameCount / this.frames), 0.0);
+      if(this.frameCount >= this.frames)
+        this.raise('Finished');
     }
   };
   _.extend(FadeOutEffect.prototype, Effect.prototype);
@@ -184,9 +186,32 @@
         this.quad.alpha = Math.max((percentage - 0.5) * 2.0, 0.0);
       else
         this.quad.alpha = Math.max((0.5 - percentage) * 2.0, 0.0);
+      if(this.frameCount >= this.frames)
+        this.raise('Finished');
     }
   };
   _.extend(FadeInAndOutEffect.prototype, Effect.prototype);
+
+  var ResizeWidthEffect = function(quad, newWidth, frames) {
+    Effect.call(this);
+    this.quad = quad;
+    this.oldWidth = quad.width;
+    this.newWidth = newSize;
+    this.frames = frames;
+    this.frameCount = 0;
+  };
+
+  ResizeWidthEffect.prototype = {
+    update: function() {
+      this.frameCount++;
+      var percentage = this.frameCount / this.frames;
+      var difference = this.newWidth - this.oldWidth;
+      var adjuster = difference * percentage;
+      this.quad.width = this.oldWidth + adjuster;
+      if(this.frameCount >= this.frames)
+        this.raise('Finished');
+    }
+  };
 
   var Scene = function() {
     Eventable.call(this);
@@ -280,10 +305,13 @@
       if(this.effect)
         this.removeEffect();
       this.effect = effect;
-      this.effect.once('finished', this.removeEffect, this);
+      this.effect.on('Finished', this.removeEffect, this);
     },
     removeEffect: function() {
-      this.effect = null;
+      if(this.effect) {
+        this.effect.off('Finished', this.removeEffect, this);
+        this.effect = null;  
+      }      
     },
     hitTest: function(x, y) {
       if(!this.physical) return false;
