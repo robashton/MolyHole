@@ -524,7 +524,7 @@
   _.extend(FluffGenerator.prototype, Eventable.prototype);
 
   var Plughole = function() {
-    Quad.call(this, 80, 20, GlobalResources.getTexture('assets/PlugHole.png'));
+    Quad.call(this, 80, 20, GlobalResources.getTexture('assets/plughole/plughole.png'));
     Eventable.call(this);
 
     this.x = 360;
@@ -666,7 +666,7 @@
   _.extend(FloorWater.prototype, Quad.prototype);
 
   var Spider = function() {
-    Quad.call(this, 60, 60, GlobalResources.getTexture('assets/Spider 1.png'));
+    Quad.call(this, 60, 60, GlobalResources.getTexture('assets/spiderstatic/staticspider.png'));
     this.x = 730;
     this.y = 640;
     this.id = "spider";
