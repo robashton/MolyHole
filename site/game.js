@@ -192,26 +192,28 @@
   };
   _.extend(FadeInAndOutEffect.prototype, Effect.prototype);
 
-  var ResizeWidthEffect = function(quad, newWidth, frames) {
+  var ResizeWaterfallEffect = function(quad, newWidth, frames) {
     Effect.call(this);
     this.quad = quad;
     this.oldWidth = quad.width;
-    this.newWidth = newSize;
+    this.newWidth = newWidth;
     this.frames = frames;
     this.frameCount = 0;
   };
 
-  ResizeWidthEffect.prototype = {
+  ResizeWaterfallEffect.prototype = {
     update: function() {
       this.frameCount++;
       var percentage = this.frameCount / this.frames;
       var difference = this.newWidth - this.oldWidth;
       var adjuster = difference * percentage;
       this.quad.width = this.oldWidth + adjuster;
+      this.quad.updatePosition();
       if(this.frameCount >= this.frames)
         this.raise('Finished');
     }
   };
+  _.extend(ResizeWaterfallEffect.prototype, Effect.prototype);
 
   var Scene = function() {
     Eventable.call(this);
@@ -512,9 +514,13 @@
       var difference = this.destx - (this.x + this.width / 2.0);
       var accuracy = this.speed / 2.0;
       if(difference > accuracy)
-        this.x += this.speed;
+        this.moveBy(this.speed);
       else if(difference < -accuracy)
-        this.x -= this.speed;
+        this.moveBy(-this.speed);
+    },
+    moveBy: function(value) {
+      this.x += value;
+      this.raise('Moved');
     },
     canAttract: function(other) {
       return other.distanceFrom(this) < 150;
@@ -531,26 +537,51 @@
   };
   _.extend(Bathtub.prototype, Quad.prototype);
 
-  var Waterfall = function() {
+  var Waterfall = function(fluffGoal) {
     Quad.call(this, 80, CANVASHEIGHT / 2.0, '#00F');
     this.id = "waterfall";
-    this.lastx = -1;
+    this.fluffGoal = fluffGoal;
+    this.currentFluff = 0;
   };
   Waterfall.prototype = {
-    calculateDimensions: function() {
-      this.x = (CANVASWIDTH / 2.0) - this.width / 2.0;
-      this.y = CANVASHEIGHT / 2.0;
+    onAddedToScene: function() {
+      this.scene.on('FluffSuccess', this.onFluffSuccess, this);
+      this.scene.on('FluffFailure', this.onFluffFailure, this);
+      this.scene.withEntity("plughole", _.bind(this.hookPlugholeEvents, this));
+      this.width = this.calculateDesiredWidth();
+      this.updatePosition();
+    },  
+    onFluffSuccess: function() {
+      this.currentFluff++;
+      this.resize();
     },
-    updatePositionWith: function(plughole) {
-      var middleOfPlughole = (plughole.x + plughole.width / 2.0); 
-      this.x = middleOfPlughole - (this.width / 2.0);
-      this.y = CANVASHEIGHT / 2.0 + plughole.height;
-      this.lastx = plughole.x;
+    onFluffFailure: function() {
+      this.currentFluff--;
+      this.resize();
     },
-    tick: function() {
+    hookPlugholeEvents: function(plughole) {
+      var self = this;
+      plughole.on('Moved', function() {
+        self.updatePosition();
+      });
+    },
+    resize: function() {
+      var newWidth = this.calculateDesiredWidth();
+      this.setEffect(new ResizeWaterfallEffect(this, newWidth, 20));
+    },
+    calculateDesiredWidth: function() {
+      var width = 0;
       this.scene.withEntity("plughole", _.bind(function(plughole) {
-        if(this.lastx === plughole.x) return;
-        this.updatePositionWith(plughole);
+        var percentage = 1.0 - (this.currentFluff / this.fluffGoal);
+        width = plughole.width * percentage;
+      },this));
+      return width;
+    },
+    updatePosition: function() {
+      this.scene.withEntity("plughole", _.bind(function(plughole) {
+        var middleOfPlughole = (plughole.x + plughole.width / 2.0); 
+        this.x = middleOfPlughole - (this.width / 2.0);
+        this.y = CANVASHEIGHT / 2.0 + plughole.height;
       }, this));
     }
   };
@@ -649,16 +680,17 @@
     this.renderer = new Renderer('game');
     this.input = new Input('game', this.scene);
     this.createEntities();
+    this.fluffGoal = 10;
   };
 
   Game.prototype = {
     createEntities: function() {
       this.fluffgenerator = new FluffGenerator(this.scene);
       this.bathtub = new Bathtub();
-      this.waterfall = new Waterfall();
+      this.waterfall = new Waterfall(10);
       this.plughole = new Plughole();
       this.spider = new Spider();
-      this.collectedfluff = new CollectedFluff(5);
+      this.collectedfluff = new CollectedFluff(10);
     },
     start: function() {
       this.scene.add(this.fluffgenerator);
