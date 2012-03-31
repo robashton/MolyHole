@@ -241,13 +241,14 @@
     }
   };
 
-  var Fluff = function(speed, size) {
+  var Fluff = function(speed, size, type) {
     Quad.call(this, size, size);
     Eventable.call(this);
 
     this.speed = speed;
     this.size = size;
 
+    this.type = type;
     this.x = 0;
     this.y = 0;
     this.physical = true;
@@ -256,6 +257,7 @@
     this.generateNewBounds();
     this.currentStrategy = this.driftStrategy;
     this.expireTime = 0;
+    this.colour = this.type === Fluff.Type.BAD ? '#000' : '#FFF';
   };
 
   Fluff.prototype = {
@@ -339,13 +341,17 @@
       this.y += direction.y * CAPTUREDFLUFFSPEED;
     }
   };
+  Fluff.Type = {
+    GOOD: 0,
+    BAD: 1
+  };
   _.extend(Fluff.prototype, Quad.prototype, Eventable.prototype);
 
   var FluffGenerator = function() {
     Eventable.call(this);
     this.scene = null;
     this.id = "fluffgenerator";
-    this.rate = 120;
+    this.rate = 180;
     this.frame = 0;
     this.difficulty = 0.5;
   };
@@ -357,9 +363,19 @@
     },
     generateFluff: function() {
       var size = Math.random() * 30 + 30;
-      var speed = Math.random() * this.difficulty + this.difficulty;
-      var fluff = new Fluff(speed, size);
+      var speed = this.generateSpeed();
+      var type = this.generateType();
+      var fluff = new Fluff(speed, size, type);
       this.scene.add(fluff);
+    },
+    generateType: function() {
+      var seed = Math.random() * 3.0;
+      if(seed < this.difficulty)
+        return Fluff.Type.BAD;
+      return Fluff.Type.GOOD;
+    },
+    generateSpeed: function() {
+      return Math.random() * this.difficulty + this.difficulty;
     }
   };
   _.extend(FluffGenerator.prototype, Eventable.prototype);
