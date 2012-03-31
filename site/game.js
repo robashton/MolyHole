@@ -342,11 +342,23 @@
 
     this.x = 360;
     this.y = 390;
+    this.destx = CANVASWIDTH / 2.0;
+    this.speed = 5.0;
     this.id = "plughole";
   };
 
   Plughole.prototype = {
-
+    moveTo: function(x, y) {
+      this.destx = x;
+    },
+    tick: function() {
+      var difference = this.destx - (this.x + this.width / 2.0);
+      if(difference > 1.0)
+        this.x += this.speed;
+      else if(difference < -1.0)
+        this.x -= this.speed;
+      
+    }
   };
   _.extend(Plughole.prototype, Quad.prototype, Eventable.prototype);
 
@@ -364,12 +376,24 @@
     Quad.call(this, 80, CANVASHEIGHT / 2.0, '#00F');
     Eventable.call(this);
     this.id = "waterfall";
-    this.calculateDimensions();
+    this.lastx = -1;
   };
   Waterfall.prototype = {
     calculateDimensions: function() {
       this.x = (CANVASWIDTH / 2.0) - this.width / 2.0;
       this.y = CANVASHEIGHT / 2.0;
+    },
+    updatePositionWith: function(plughole) {
+      var middleOfPlughole = (plughole.x + plughole.width / 2.0); 
+      this.x = middleOfPlughole - (this.width / 2.0);
+      this.y = CANVASHEIGHT / 2.0;
+      this.lastx = plughole.x;
+    },
+    tick: function() {
+      this.scene.withEntity("plughole", _.bind(function(plughole) {
+        if(this.lastx === plughole.x) return;
+        this.updatePositionWith(plughole);
+      }, this));
     }
   };
   _.extend(Waterfall.prototype, Quad.prototype, Eventable.prototype)
@@ -413,9 +437,8 @@
       this.actionOn(e.clientX, e.clientY);
     },
     actionOn: function(x, y) {
-      this.scene.withEntityAt(x, y, function(entity) {
-        if(entity.interact)
-          entity.interact();
+      this.scene.withEntity("plughole", function(entity) {
+        entity.moveTo(x, y);
       });
     }
   };
