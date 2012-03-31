@@ -221,13 +221,22 @@
         return false;
       return true;
     },
-    directionTo: function(other) {
-      var dx = other.x - this.x;
-      var dy = other.y - this.y;
-      var mag = Math.sqrt((dx * dx) + (dy * dy));
+    distanceFrom: function(other) {
+      var d = this.vectorTo(other);
+      return Math.sqrt((d.x * d.x) + (d.y * d.y));
+    },
+    vectorTo: function(other) {
       return {
-        x: dx / mag,
-        y: dy / mag
+        x: (other.x + other.width / 2.0) - (this.x + this.width / 2.0),
+        y: (other.y + other.height / 2.0) - (this.y + this.height / 2.0)
+      };
+    },
+    directionTo: function(other) {
+      var d = this.vectorTo(other);
+      var mag = Math.sqrt((d.x * d.x) + (d.y * d.y));
+      return {
+        x: d.x / mag,
+        y: d.y / mag
       };
     }
   };
@@ -268,10 +277,29 @@
     },
     driftStrategy: function() {
       this.calculateDirection();
+      this.updatePosition();
+      if(this.isNearPlughole()) {
+        this.switchToSelectedStrategy();
+      }
+      else if(this.hasTouchedFloor())
+        this.switchToFailedStrategy();
+    },
+    isNearPlughole: function() {
+      if(this.y + this.size < CANVASHEIGHT / 3.0)
+        return false;
+      var captured = false;
+      this.scene.withEntity("plughole", _.bind(function(plughole) {
+        if(plughole.canAttract(this))
+          captured = true;
+      }, this));
+      return captured;
+    },
+    updatePosition: function() {
       this.y += this.speed;
       this.x += (this.speed * this.direction * 10.0);
-      if(this.y + this.size > CANVASHEIGHT / 2.0)
-        this.switchToFailedStrategy();
+    },
+    hasTouchedFloor: function() {
+      return this.y + this.size > CANVASHEIGHT / 2.0;
     },
     interact: function() {
       if(this.currentStrategy == this.driftStrategy) {
@@ -285,7 +313,7 @@
     },
     switchToSelectedStrategy: function() {
       this.raise('FluffSelected');
-      this.currentStrategy = this.selectedStrategy;
+      this.currentStrategy = this.attractedStrategy;
     },
     switchToSuccessStrategy: function() {
       this.raise('FluffSuccess');
@@ -297,7 +325,7 @@
       if(this.expireTime > 30)
         this.scene.remove(this);
     },
-    selectedStrategy: function() {
+    attractedStrategy: function() {
       this.scene.withEntity('plughole', _.bind(function(plughole) {
         if(this.intersects(plughole))
           this.switchToSuccessStrategy();
@@ -317,7 +345,7 @@
     Eventable.call(this);
     this.scene = null;
     this.id = "fluffgenerator";
-    this.rate = 60;
+    this.rate = 120;
     this.frame = 0;
     this.difficulty = 0.5;
   };
@@ -343,7 +371,7 @@
     this.x = 360;
     this.y = 390;
     this.destx = CANVASWIDTH / 2.0;
-    this.speed = 5.0;
+    this.speed = 10.0;
     this.id = "plughole";
   };
 
@@ -353,11 +381,14 @@
     },
     tick: function() {
       var difference = this.destx - (this.x + this.width / 2.0);
-      if(difference > 1.0)
+      var accuracy = this.speed / 2.0;
+      if(difference > accuracy)
         this.x += this.speed;
-      else if(difference < -1.0)
+      else if(difference < -accuracy)
         this.x -= this.speed;
-      
+    },
+    canAttract: function(other) {
+      return other.distanceFrom(this) < 150;
     }
   };
   _.extend(Plughole.prototype, Quad.prototype, Eventable.prototype);
