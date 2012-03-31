@@ -143,32 +143,33 @@
    
     this.speed = speed;
     this.size = size;
-    this.offset = Math.random() * CANVASWIDTH;
 
     this.x = 0;
     this.y = 0;
-    this.z = 0;
+    this.direction = 1;
     this.id = 'fluff-' + Math.random() * 100000;
+    this.generateNewBounds();
   };
 
   Fluff.prototype = {
     tick: function() {
+      this.calculateDirection();
       this.y += this.speed;
-      this.z = Math.sin(this.y * 0.07);
-      this.calculateHorizontalPosition();       
-      this.resizeOnDepth();
-      console.log(this.x);
+      this.x += (this.speed * this.direction * 10.0);
     },
-    calculateHorizontalPosition: function() {
-      var multiplier = Math.cos(this.y * 0.07);
-      var unadjustedX = (Math.abs(multiplier) * CANVASWIDTH);
-      this.x = unadjustedX;
+    calculateDirection: function() {
+      var middle = this.x + this.size / 2.0;
+      if((middle < this.min && this.direction < 0) || (middle > this.max && this.direction > 0))
+        this.switchDirection();
     },
-    resizeOnDepth: function() {
-      var size = (this.z + 1.3) * this.size;
-      this.width = size;
-      this.height = size;
-    }
+    switchDirection: function() {
+      this.direction = -this.direction;
+      this.generateNewBounds();
+    },
+    generateNewBounds: function() {
+      this.min = Math.random() * (CANVASWIDTH / 2.0);
+      this.max = CANVASWIDTH - this.min;
+    },
   };
   _.extend(Fluff.prototype, Quad.prototype);
 
@@ -177,7 +178,9 @@
     this.id = "fluffgenerator";
     this.rate = 2000;
     this.frame = 0;
+    this.difficulty = 0.5;
   };
+  
   FluffGenerator.prototype = {
     tick: function() {
       if(this.frame++ % this.rate === 0)
@@ -185,7 +188,7 @@
     },
     generateFluff: function() {
       var size = Math.random() * 30 + 30;
-      var speed = Math.random() * 5;
+      var speed = Math.random() * this.difficulty + this.difficulty;
       var fluff = new Fluff(speed, size);
       this.scene.add(fluff);
     }
