@@ -1,6 +1,7 @@
 (function(exports) {
   var CANVASWIDTH = 800;
   var CANVASHEIGHT = 800;
+  var CAPTUREDFLUFFSPEED = 10.0;
 
   var EventContainer = function(defaultContext) {
     this.handlers = [];
@@ -70,6 +71,10 @@
       this.allContainer.add(callback, context);
     },
 
+    offAny: function(callback, context) {
+      this.allContainer.remove(callback, context);
+    },
+
     raise: function(eventName, data, sender) {
       this.audit(eventName, data);
       var container = this.eventListeners[eventName];
@@ -97,16 +102,42 @@
     }
   };
 
+  var Effect = function() {
+    Eventable.call(this);
+  };
+  Effect.prototype = {
+
+  };
+  _.extend(Effect.prototype, Eventable.prototype);
+
+  var FadeEffect = function(frames, quad) {
+    Effect.call(this);
+
+    this.frames = frames;
+    this.quad = quad;
+    this.frameCount = 0;
+  };
+  FadeEffect.prototype = {
+    update: function() {
+
+    }
+  };
+  _.extend(FadeEffect.prototype, Effect.prototype);
+
   var Scene = function() {
+    Eventable.call(this);
     this.entities = {};
   };
 
   Scene.prototype = {
     add: function(entity) {
       this.entities[entity.id] = entity;
+      entity.scene = this;
+      entity.onAny(this.onEntityEvent, this);
     },
     remove: function(entity) {
       delete this.entities[entity.id];
+      entity.offAny(this.onEntityEvent, this);
     },
     render: function(context) {
       this.each(function(entity) {
@@ -120,64 +151,177 @@
     },
     each: function(cb) {
       for(var key in this.entities) {
-        cb(this.entities[key]);
+        if(cb(this.entities[key]))
+          return;
       }
+    },
+    onEntityEvent: function(event, data, sender) {
+      this.raise(event, data);
+    },
+    withEntityAt: function(x, y, cb) {
+      this.each(function(entity) {
+        if(entity.hitTest && entity.hitTest(x, y)) {
+          cb(entity);
+          return true;
+        }
+      });
+    },
+    withEntity: function(id, cb) {
+      var entity = this.entities[id];
+      if(!entity)
+        console.warn("Missing entity", id);
+      else
+        cb(entity);
     }
   };
+  _.extend(Scene.prototype, Eventable.prototype);
 
-  var Quad = function(width, height) {
+  var Quad = function(width, height, colour) {
     this.width = width;
     this.height = height;
     this.x = 0;
     this.y = 0;
+    this.effect = null;
+    this.colour = colour || '#000';
+    this.physical = false;
   };
+
   Quad.prototype = {
     render: function(context) {
-      context.fillStyle = '#000';
+      if(this.effect)
+        this.effect.update();
+      context.fillStyle = this.colour;
       context.fillRect(this.x, this.y, this.width, this.height);
+    },
+    setEffect: function(effect) {
+      if(this.effect)
+        this.removeEffect();
+      this.effect = effect;
+      this.effect.once('finished', this.removeEffect, this);
+    },
+    removeEffect: function() {
+      this.effect = null;
+    },
+    hitTest: function(x, y) {
+      if(!this.physical) return false;
+      if(x < this.x) return false;
+      if(x > this.x + this.width) return false;
+      if(y < this.y) return false;
+      if(y > this.y + this.height) return false;
+      return true;
+    },
+    intersects: function(other) {
+      if(other.x + other.width < this.x)
+        return false;
+      if(other.x > this.x + this.width)
+        return false;
+      if(other.y + other.height < this.y)
+        return false;
+      if(other.y > this.y + this.height)
+        return false;
+      return true;
+    },
+    directionTo: function(other) {
+      var dx = other.x - this.x;
+      var dy = other.y - this.y;
+      var mag = Math.sqrt((dx * dx) + (dy * dy));
+      return {
+        x: dx / mag,
+        y: dy / mag
+      };
     }
   };
 
   var Fluff = function(speed, size) {
     Quad.call(this, size, size);
-   
+    Eventable.call(this);
+
     this.speed = speed;
     this.size = size;
-    this.offset = Math.random() * CANVASWIDTH;
 
     this.x = 0;
     this.y = 0;
-    this.z = 0;
+    this.physical = true;
+    this.direction = 1;
     this.id = 'fluff-' + Math.random() * 100000;
+    this.generateNewBounds();
+    this.currentStrategy = this.driftStrategy;
+    this.expireTime = 0;
   };
 
   Fluff.prototype = {
     tick: function() {
+      this.currentStrategy();
+    },
+    calculateDirection: function() {
+      var middle = this.x + this.size / 2.0;
+      if((middle < this.min && this.direction < 0) || (middle > this.max && this.direction > 0))
+        this.switchDirection();
+    },
+    switchDirection: function() {
+      this.direction = -this.direction;
+      this.generateNewBounds();
+    },
+    generateNewBounds: function() {
+      this.min = Math.random() * (CANVASWIDTH / 2.0);
+      this.max = CANVASWIDTH - this.min;
+    },
+    driftStrategy: function() {
+      this.calculateDirection();
       this.y += this.speed;
-      this.z = Math.sin(this.y * 0.07);
-      this.calculateHorizontalPosition();       
-      this.resizeOnDepth();
-      console.log(this.x);
+      this.x += (this.speed * this.direction * 10.0);
+      if(this.y + this.size > CANVASHEIGHT / 2.0)
+        this.switchToFailedStrategy();
     },
-    calculateHorizontalPosition: function() {
-      var multiplier = Math.cos(this.y * 0.07);
-      var unadjustedX = (Math.abs(multiplier) * CANVASWIDTH);
-      this.x = unadjustedX;
+    interact: function() {
+      if(this.currentStrategy == this.driftStrategy) {
+        this.switchToSelectedStrategy();
+      }
     },
-    resizeOnDepth: function() {
-      var size = (this.z + 1.3) * this.size;
-      this.width = size;
-      this.height = size;
+    switchToFailedStrategy: function() {
+      this.raise('FluffFailure');
+      this.setEffect(new FadeEffect(30));
+      this.currentStrategy = this.expireStrategy;
+    },
+    switchToSelectedStrategy: function() {
+      this.raise('FluffSelected');
+      this.currentStrategy = this.selectedStrategy;
+    },
+    switchToSuccessStrategy: function() {
+      this.raise('FluffSuccess');
+      this.setEffect(new FadeEffect(30));
+      this.currentStrategy = this.expireStrategy;
+    },
+    expireStrategy: function() {
+      this.expireTime++;
+      if(this.expireTime > 30)
+        this.scene.remove(this);
+    },
+    selectedStrategy: function() {
+      this.scene.withEntity('plughole', _.bind(function(plughole) {
+        if(this.intersects(plughole))
+          this.switchToSuccessStrategy();
+        else
+          this.moveTowards(plughole);
+      }, this));
+    },
+    moveTowards: function(target) {
+      var direction = this.directionTo(target);
+      this.x += direction.x * CAPTUREDFLUFFSPEED;
+      this.y += direction.y * CAPTUREDFLUFFSPEED;
     }
   };
-  _.extend(Fluff.prototype, Quad.prototype);
+  _.extend(Fluff.prototype, Quad.prototype, Eventable.prototype);
 
-  var FluffGenerator = function(scene) {
-    this.scene = scene;
+  var FluffGenerator = function() {
+    Eventable.call(this);
+    this.scene = null;
     this.id = "fluffgenerator";
-    this.rate = 2000;
+    this.rate = 60;
     this.frame = 0;
+    this.difficulty = 0.5;
   };
+
   FluffGenerator.prototype = {
     tick: function() {
       if(this.frame++ % this.rate === 0)
@@ -185,14 +329,17 @@
     },
     generateFluff: function() {
       var size = Math.random() * 30 + 30;
-      var speed = Math.random() * 5;
+      var speed = Math.random() * this.difficulty + this.difficulty;
       var fluff = new Fluff(speed, size);
       this.scene.add(fluff);
     }
   };
+  _.extend(FluffGenerator.prototype, Eventable.prototype);
 
   var Plughole = function() {
     Quad.call(this, 80, 20);
+    Eventable.call(this);
+
     this.x = 360;
     this.y = 390;
     this.id = "plughole";
@@ -201,10 +348,35 @@
   Plughole.prototype = {
 
   };
-  _.extend(Plughole.prototype, Quad.prototype);
+  _.extend(Plughole.prototype, Quad.prototype, Eventable.prototype);
+
+  var Bathtub = function() {
+    Quad.call(this, CANVASWIDTH, CANVASHEIGHT / 2.0, '#00F');
+    Eventable.call(this);
+    this.id = "bathtub";
+  };
+  Bathtub.prototype = {
+
+  };
+  _.extend(Bathtub.prototype, Quad.prototype, Eventable.prototype);
+
+  var Waterfall = function() {
+    Quad.call(this, 80, CANVASHEIGHT / 2.0, '#00F');
+    Eventable.call(this);
+    this.id = "waterfall";
+    this.calculateDimensions();
+  };
+  Waterfall.prototype = {
+    calculateDimensions: function() {
+      this.x = (CANVASWIDTH / 2.0) - this.width / 2.0;
+      this.y = CANVASHEIGHT / 2.0;
+    }
+  };
+  _.extend(Waterfall.prototype, Quad.prototype, Eventable.prototype)
 
   var Spider = function() {
     Quad.call(this, 60, 60);
+    Eventable.call(this);
     this.x = 370;
     this.y = 740;
     this.id = "spider";
@@ -213,6 +385,7 @@
   Spider.prototype = {
 
   };
+  _.extend(Spider.prototype, Eventable.prototype);
 
   var Renderer = function(id) {
     this.canvas = document.getElementById(id);
@@ -221,19 +394,43 @@
 
   Renderer.prototype = {
     clear: function() {
-      this.context.fillStyle = '#55F';
+      this.context.fillStyle = '#F0F';
       this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+  };
+
+  var Input = function(id, scene) {
+    this.element = document.getElementById(id);
+    this.scene = scene;
+
+    $(this.element).on({
+      click: _.bind(this.onClick, this)
+    });
+  };
+
+  Input.prototype = {
+    onClick: function(e) {
+      this.actionOn(e.clientX, e.clientY);
+    },
+    actionOn: function(x, y) {
+      this.scene.withEntityAt(x, y, function(entity) {
+        if(entity.interact)
+          entity.interact();
+      });
     }
   };
 
   var Game = function() {
     this.scene = new Scene();
     this.renderer = new Renderer('game');
+    this.input = new Input('game', this.scene);
   };
 
   Game.prototype = {
     start: function() {
       this.scene.add(new FluffGenerator(this.scene));
+      this.scene.add(new Bathtub());
+      this.scene.add(new Waterfall());
       this.scene.add(new Plughole());
       this.scene.add(new Spider());
       var self = this;
