@@ -76,7 +76,6 @@
     },
 
     raise: function(eventName, data, sender) {
-      this.audit(eventName, data);
       var container = this.eventListeners[eventName];
 
       if(container)
@@ -86,10 +85,6 @@
         event: eventName,
         data: data
       });
-    },
-    
-    audit: function(eventName, data) {
-      
     },
 
     eventContainerFor: function(eventName) {
@@ -178,6 +173,7 @@
     this.frames = frames;
     this.frameCount = 0;
   };
+
   FadeInAndOutEffect.prototype = {
     update: function() {
       this.frameCount++;
@@ -587,6 +583,52 @@
   };
   _.extend(Waterfall.prototype, Quad.prototype, Eventable.prototype)
 
+  var Floor = function(height) {
+    Quad.call(this, CANVASWIDTH, height, '#B44');
+    this.id = "floor";
+    this.x = 0;
+    this.y = CANVASHEIGHT - height;
+  };
+  _.extend(Floor.prototype, Quad.prototype);
+
+
+  var FloorWater = function(fluffGoal, rate) { 
+    Quad.call(this, 0, 0, '#00F');
+    this.id = "floorwater";
+    this.rate = rate;
+    this.height = 0;
+    this.width = CANVASWIDTH;
+    this.y = 0;
+    this.x = 0;
+    this.currentRate = rate; 
+    this.fluffGoal = fluffGoal;
+    this.currentFluff = 0;
+  };
+
+  FloorWater.prototype = {
+    onAddedToScene: function() {
+      this.scene.on('FluffSuccess', this.onFluffSuccess, this);
+      this.scene.on('FluffFailure', this.onFluffFailure, this);
+    },
+    onFluffSuccess: function() {
+      this.currentFluff++;
+      this.calculateNewRate();
+    },
+    onFluffFailure: function() {
+      this.currentFluff--;
+      this.calculateNewRate();
+    },
+    calculateNewRate: function() {
+      this.currentRate = this.rate * (1.0 - this.currentFluff / this.fluffGoal);
+    },
+    tick: function() {
+      this.height += this.rate;
+      this.y = CANVASHEIGHT - this.height;
+    }
+  };
+
+  _.extend(FloorWater.prototype, Quad.prototype);
+
   var Spider = function() {
     Quad.call(this, 60, 60);
     Eventable.call(this);
@@ -658,7 +700,14 @@
         this.y = plughole.y;   
       }, this));
     },
+    clampCount: function() {
+     if(this.count < 0) 
+       this.count = 0;
+     else if(this.count > this.maxCount)
+      this.count = this.maxCount;
+    },
     resize: function() {
+     this.clampCount();
      this.setEffect(new FadeInAndOutEffect(this, 20));
      if(this.count <= 0) {
        this.visible = false;
@@ -679,26 +728,30 @@
     this.scene = new Scene();
     this.renderer = new Renderer('game');
     this.input = new Input('game', this.scene);
-    this.createEntities();
     this.fluffGoal = 10;
+    this.createEntities();
   };
 
   Game.prototype = {
     createEntities: function() {
       this.fluffgenerator = new FluffGenerator(this.scene);
       this.bathtub = new Bathtub();
-      this.waterfall = new Waterfall(10);
+      this.waterfall = new Waterfall(this.fluffGoal);
       this.plughole = new Plughole();
       this.spider = new Spider();
-      this.collectedfluff = new CollectedFluff(10);
+      this.collectedfluff = new CollectedFluff(this.fluffGoal);
+      this.floor = new Floor(100);
+      this.floorWater = new FloorWater(this.fluffGoal, 1.0 / 60.0);
     },
     start: function() {
       this.scene.add(this.fluffgenerator);
       this.scene.add(this.bathtub);
       this.scene.add(this.plughole);
-      this.scene.add(this.waterfall);
       this.scene.add(this.spider);
       this.scene.add(this.collectedfluff);
+      this.scene.add(this.floor);
+      this.scene.add(this.waterfall);
+      this.scene.add(this.floorWater);
       this.scene.autoHook(this);
       this.startTimers();      
     },
