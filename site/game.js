@@ -649,7 +649,7 @@
 
   Renderer.prototype = {
     clear: function() {
-      this.context.fillStyle = '#F0F';
+      this.context.fillStyle = '#DDD';
       this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
   };
@@ -657,20 +657,48 @@
   var Input = function(id, scene) {
     this.element = document.getElementById(id);
     this.scene = scene;
-
-    $(this.element).on({
+    this.wrappedElement = $(this.element);
+    this.wrappedElement.on({
       click: _.bind(this.onClick, this)
     });
+    this.element.addEventListener('touchstart', _.bind(this.onTouchStart, this), true);
+    this.element.addEventListener('touchmove', _.bind(this.onTouchMove, this), true);
+    this.element.addEventListener('touchend', _.bind(this.onTouchEnd, this), true);
   };
 
   Input.prototype = {
     onClick: function(e) {
       this.actionOn(e.clientX, e.clientY);
     },
+    onTouchStart: function(e) {
+      if(!e) var e = event;
+      e.preventDefaults();
+      var touch = e.touches[0];
+      var coords = this.pageToCanvas(touch.pageX, touch.pageY);
+      actionOn(coords.x, coords.y);
+    },
+    onTouchMove: function(e) {
+      if(!e) var e = event;
+      e.preventDefaults();
+      var touch = e.touches[0];
+      var coords = this.pageToCanvas(touch.pageX, touch.pageY);
+      actionOn(coords.x, coords.y);
+    },
+    onTouchEnd: function(e) {
+      if(!e) var e = event;
+      e.preventDefaults();
+    },
     actionOn: function(x, y) {
       this.scene.withEntity("plughole", function(entity) {
         entity.moveTo(x, y);
       });
+    },
+    pageToCanvas: function(x, y) {
+      var offset = this.wrappedElement.offset();
+      return {
+        x: x - offset.left,
+        y: y - offset.top
+      };
     }
   };
 
