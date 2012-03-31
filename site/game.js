@@ -155,7 +155,7 @@
   };
   _.extend(Effect.prototype, Eventable.prototype);
 
-  var FadeEffect = function(frames, quad) {
+  var FadeEffect = function(quad, frames) {
     Effect.call(this);
 
     this.frames = frames;
@@ -164,7 +164,9 @@
   };
   FadeEffect.prototype = {
     update: function() {
-
+      this.frameCount++;
+      this.quad.alpha = Math.max(1.0 - (this.frameCount / this.frames), 0.0);
+      console.log(this.quad.alpha);
     }
   };
   _.extend(FadeEffect.prototype, Effect.prototype);
@@ -234,6 +236,7 @@
     this.colour = colour || '#000';
     this.physical = false;
     this.visible = true;
+    this.alpha = 1.0;
   };
 
   Quad.prototype = {
@@ -241,6 +244,8 @@
       if(this.effect)
         this.effect.update();
       if(!this.visible) return;
+
+      context.globalAlpha = this.alpha;
       if(this.colour instanceof Image)
         this.renderTexture(context);
       else
@@ -371,7 +376,7 @@
     },
     switchToFailedStrategy: function() {
       this.raise('FluffFailure');
-      this.setEffect(new FadeEffect(Fluff.FadeTime));
+      this.setEffect(new FadeEffect(this, Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
     switchToSelectedStrategy: function() {
@@ -380,7 +385,7 @@
     },
     switchToSuccessStrategy: function() {
       this.raise('FluffSuccess');
-      this.setEffect(new FadeEffect(Fluff.FadeTime));
+      this.setEffect(new FadeEffect(this, Fluff.FadeTime));
       this.currentStrategy = this.expireStrategy;
     },
     expireStrategy: function() {
