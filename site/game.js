@@ -166,7 +166,6 @@
     update: function() {
       this.frameCount++;
       this.quad.alpha = Math.max(1.0 - (this.frameCount / this.frames), 0.0);
-      console.log(this.quad.alpha);
     }
   };
   _.extend(FadeEffect.prototype, Effect.prototype);
@@ -205,8 +204,8 @@
           return;
       }
     },
-    onEntityEvent: function(event, data, sender) {
-      this.raise(event, data);
+    onEntityEvent: function(e, sender) {
+      this.raise(e.event, e.data, sender);
     },
     withEntityAt: function(x, y, cb) {
       this.each(function(entity) {
@@ -558,7 +557,7 @@
 
   var CollectedFluff = function(maxCount) {
     Quad.call(this, 0, 0);
-  
+
     this.visible = false;
     this.count = 0;
     this.maxCount = maxCount;
@@ -576,17 +575,25 @@
       this.count--;
       this.resize();
     },
+    tick: function() {
+      this.scene.withEntity("plughole", _.bind(function(plughole) {
+        this.x = plughole.x + (plughole.width - this.width) / 2.0;
+        this.y = plughole.y;   
+      }, this));
+    },
     resize: function() {
+      console.log(this.count);
      if(this.count <= 0) {
        this.visible = false;
      }
      else {
        this.visible = true;
-       var percentage = this.maxCount / this.count;
+       var percentage = this.count / this.maxCount;
        this.scene.withEntity("plughole", _.bind(function(plughole) {
           this.width = plughole.width * percentage;
           this.height = plughole.height * percentage;
        }, this));
+       console.log(this.x, this.y, this.width, this.height);
      } 
     }
   }
@@ -606,7 +613,7 @@
       this.waterfall = new Waterfall();
       this.plughole = new Plughole();
       this.spider = new Spider();
-      this.collectedfluff = new CollectedFluff();
+      this.collectedfluff = new CollectedFluff(5);
     },
     start: function() {
       this.scene.add(this.fluffgenerator);
