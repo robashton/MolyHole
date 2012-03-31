@@ -1,4 +1,6 @@
-(function() {
+(function(exports) {
+  var CANVASWIDTH = 800;
+  var CANVASHEIGHT = 800;
 
   var EventContainer = function(defaultContext) {
     this.handlers = [];
@@ -99,7 +101,7 @@
     this.entities = {};
   };
 
-  Scene.prototype = function() {
+  Scene.prototype = {
     add: function(entity) {
       this.entities[entity.id] = entity;
     },
@@ -123,15 +125,7 @@
     }
   };
 
-  var FluffGenerator = function(scene) {
-    this.scene = scene;
-    this.id = "fluffgenerator";
-  };
-  FluffGenerator.prototype = {
-
-  };
-
-  var Quad = function(width, height)
+  var Quad = function(width, height) {
     this.width = width;
     this.height = height;
     this.x = 0;
@@ -144,25 +138,63 @@
     }
   };
 
-  var Fluff = function(speed, width, height) {
-    Quad.call(this, width, height);
-    this.speed = 0;
-    this.x = Math.random() * 800;
+  var Fluff = function(speed, size) {
+    Quad.call(this, size, size);
+   
+    this.speed = speed;
+    this.size = size;
+    this.offset = Math.random() * CANVASWIDTH;
+
+    this.x = 0;
     this.y = 0;
+    this.z = 0;
     this.id = 'fluff-' + Math.random() * 100000;
   };
 
-  Fluff.prototype = function() {
+  Fluff.prototype = {
     tick: function() {
       this.y += this.speed;
+      this.z = Math.sin(this.y * 0.07);
+      this.calculateHorizontalPosition();       
+      this.resizeOnDepth();
+      console.log(this.x);
+    },
+    calculateHorizontalPosition: function() {
+      var multiplier = Math.cos(this.y * 0.07);
+      var unadjustedX = (Math.abs(multiplier) * CANVASWIDTH);
+      this.x = unadjustedX;
+    },
+    resizeOnDepth: function() {
+      var size = (this.z + 1.3) * this.size;
+      this.width = size;
+      this.height = size;
     }
   };
   _.extend(Fluff.prototype, Quad.prototype);
 
+  var FluffGenerator = function(scene) {
+    this.scene = scene;
+    this.id = "fluffgenerator";
+    this.rate = 2000;
+    this.frame = 0;
+  };
+  FluffGenerator.prototype = {
+    tick: function() {
+      if(this.frame++ % this.rate === 0)
+        this.generateFluff();
+    },
+    generateFluff: function() {
+      var size = Math.random() * 30 + 30;
+      var speed = Math.random() * 5;
+      var fluff = new Fluff(speed, size);
+      this.scene.add(fluff);
+    }
+  };
+
   var Plughole = function() {
-    Quad.call(this, 120, 40);
-    this.x = 340;
-    this.y = 380;
+    Quad.call(this, 80, 20);
+    this.x = 360;
+    this.y = 390;
     this.id = "plughole";
   };
 
@@ -182,21 +214,45 @@
 
   };
 
+  var Renderer = function(id) {
+    this.canvas = document.getElementById(id);
+    this.context = this.canvas.getContext('2d');
+  };
+
+  Renderer.prototype = {
+    clear: function() {
+      this.context.fillStyle = '#55F';
+      this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+  };
+
   var Game = function() {
     this.scene = new Scene();
     this.renderer = new Renderer('game');
   };
 
-  Game.prototype = function() {
+  Game.prototype = {
     start: function() {
       this.scene.add(new FluffGenerator(this.scene));
       this.scene.add(new Plughole());
       this.scene.add(new Spider());
+      var self = this;
+      setInterval(function() {
+        self.tick();
+      }, 1000 / 30);
+    },
+    tick: function() {
+
+      // TODO: Decouple, use reqanimationframe
+      this.scene.tick();
+      this.renderer.clear();
+      this.scene.render(this.renderer.context);
     }
   };
 
-
-
-
-
-}).call(this);
+  $(document).ready(function(){
+    var game = new Game();
+    game.start();
+  });
+  
+})();
