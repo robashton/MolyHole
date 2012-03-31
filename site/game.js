@@ -444,7 +444,7 @@
   _.extend(FluffGenerator.prototype, Eventable.prototype);
 
   var Plughole = function() {
-    Quad.call(this, 80, 20);
+    Quad.call(this, 80, 20, GlobalResources.getTexture('assets/PlugHole.png'));
     Eventable.call(this);
 
     this.x = 360;
