@@ -446,6 +446,21 @@
       effect.off('Finished', this.onEffectFinished, this); 
       this.effects = _(this.effects).without(effect);
     },
+    queueEffects: function(effects, cb) {
+      var current = 0;
+      var self = this;
+      var nextEffect = function() {
+        if(current >= effects.length) {
+          cb();
+          return;
+        };
+        var effect = effects[current];
+        effect.once("Finished", nextEffect);
+        self.addEffect(effect);
+        current++;
+      };
+      nextEffect();
+    },
     onEffectFinished: function(data, sender) {
       this.removeEffect(sender);
     },   
@@ -989,8 +1004,31 @@
   };
   ClosingStory.prototype = {
     onAddedToScene: function() {
-      // Make spider really happy
-
+      var self = this;
+      this.scene.withEntity("spider", function(spider) {
+        spider.queueEffects(
+          [new CelebratingSpiderAnimation(spider),
+           new CelebratingSpiderAnimation(spider)
+          ], 
+        function() {
+          self.removeSpiderFromScene();
+        });
+      });  
+    },
+    removeSpiderFromScene: function() {
+      var self = this;
+      this.scene.withEntity("spider", function(spider) {
+        var effect = new FadeOutEffect(this, 60);
+        effect.on('Finished', function() {
+          self.scene.remove(spider);
+          self.showEndingScene();
+        });
+        spider.addEffect(effect);
+        spider.addEffect(new CelebratingSpiderAnimation(spider));
+      });
+    },
+    this.showEndingScene: function() {
+      
     }
   };
   _.extend(ClosingStory.prototype, Eventable.prototype);
