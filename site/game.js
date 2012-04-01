@@ -151,6 +151,17 @@
   };
   _.extend(Effect.prototype, Eventable.prototype);
 
+  var ConstantRotationEffect = function(quad, speed) {
+    this.quad = quad;
+    this.speed = speed;
+  };
+  ConstantRotationEffect.prototype = {
+    update: function() {
+      this.quad.rotation += this.speed;
+    }
+  };
+  _.extend(ConstantRotationEffect.prototype, Effect.prototype);
+
   var FadeOutEffect = function(quad, frames) {
     Effect.call(this);
 
@@ -370,7 +381,13 @@
         console.warn("Missing entity", id);
       else
         cb(entity);
-    }
+    },
+    withAllEntitiesOfType: function(type, cb) {
+      this.each(function(entity) {
+        if(entity instanceof type)
+          cb(entity);
+      });
+    },
   };
   _.extend(Scene.prototype, Eventable.prototype);
 
@@ -380,6 +397,7 @@
     this.height = height;
     this.x = 0;
     this.y = 0;
+    this.rotation = 0;
     this.effects = [];
     this.colour = colour || '#000';
     this.physical = false;
@@ -473,14 +491,29 @@
     this.y = 0;
     this.physical = true;
     this.direction = 1;
+    this.horizontalMotion  = Math.random() * 2.5 + 2.5;
     this.id = 'fluff-' + Math.random() * 100000;
     this.generateNewBounds();
     this.currentStrategy = this.driftStrategy;
     this.expireTime = 0;
-    this.colour = this.type === Fluff.Type.BAD ? '#000' : '#FFF';
+    this.determineQuadFromType();
   };
 
   Fluff.prototype = {
+    determineQuadFromType: function() {
+      if(this.type === Fluff.Type.BAD)
+        this.chooseBadQuad();
+      else
+        this.chooseGoodQuad();
+    },
+    chooseBadQuad: function() {
+      this.colour = '#000';
+    },
+    chooseGoodQuad: function() {
+      var number = Math.floor(Math.random() * 8) + 1;
+      this.colour = GlobalResources.getTexture('assets/goodfluff/hair-' + number + '.png');
+      //this.addEffect(new ConstantRotationEffect(0.01));
+    },
     tick: function() {
       this.currentStrategy();
     },
@@ -518,7 +551,7 @@
     },
     updatePosition: function() {
       this.y += this.speed;
-      this.x += (this.speed * this.direction * 10.0);
+      this.x += (this.speed * this.direction * this.horizontalMotion);
     },
     hasTouchedFloor: function() {
       return this.y + this.size > CANVASHEIGHT / 2.0;
@@ -593,7 +626,7 @@
         this.generateFluff();
     },
     generateFluff: function() {
-      var size = Math.random() * 10 + 10;
+      var size = Math.random() * 20 + 20;
       var speed = this.generateSpeed();
       var type = this.generateType();
       var fluff = new Fluff(speed, size, type);
@@ -606,7 +639,8 @@
       return Fluff.Type.GOOD;
     },
     generateSpeed: function() {
-      return Math.random() * this.difficulty + this.difficulty;
+      var seed = this.difficulty * 0.5;
+      return (Math.random() * seed) + seed;
     }
   };
   _.extend(FluffGenerator.prototype, Eventable.prototype);
@@ -639,7 +673,7 @@
       this.raise('Moved');
     },
     canAttract: function(other) {
-      if(other.distanceFrom(this) > 100) return false;
+      if(other.distanceFrom(this) > 50) return false;
       if(other.x + other.width < this.x) return false;
       if(other.x > this.x + this.width) return false;
       return true;
@@ -648,7 +682,7 @@
   _.extend(Plughole.prototype, Quad.prototype);
 
   var Bathtub = function() {
-    Quad.call(this, CANVASWIDTH, CANVASHEIGHT / 2.0, '#00F');
+    Quad.call(this, CANVASWIDTH, CANVASHEIGHT / 2.0, '#0b8adb');
     this.id = "bathtub";
   };
   Bathtub.prototype = {
@@ -703,7 +737,7 @@
   _.extend(Waterfall.prototype, Quad.prototype, Eventable.prototype)
 
   var Floor = function(height) {
-    Quad.call(this, CANVASWIDTH, height, '#B44');
+    Quad.call(this, CANVASWIDTH, height, '#663');
     this.id = "floor";
     this.x = 0;
     this.y = CANVASHEIGHT - height;
@@ -712,7 +746,7 @@
 
 
   var FloorWater = function(fluffGoal, rate) { 
-    Quad.call(this, 0, 0, '#00F');
+    Quad.call(this, 0, 0, '#0b8adb');
     this.id = "floorwater";
     this.rate = rate;
     this.height = 0;
@@ -744,9 +778,9 @@
   _.extend(FloorWater.prototype, Quad.prototype);
 
   var Spider = function() {
-    Quad.call(this, 60, 60);
-    this.x = 730;
-    this.y = 640;
+    Quad.call(this, 80, 80);
+    this.x = 700;
+    this.y = 625;
     this.id = "spider";
     this.resetAnimations();
   };
