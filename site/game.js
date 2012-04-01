@@ -259,7 +259,7 @@
     },
     updateImage: function() {
       var id = (this.frames % 2) + 1;
-      this.spider.colour = GlobalResources.getTexture('assets/spiderscared/scared-' + id + '.png');
+      this.spider.colour = GlobalResources.getTexture('assets/spiderdrowning/drowning-' + id + '.png');
     },
     updateFrame: function() {
       if(this.ticks++ % 3 === 0)
@@ -855,7 +855,7 @@
       this.scene.off('FluffSuccess', this.onFluffSuccess, this);
     },
     onFluffSuccess: function() {
-      this.difficulty += 0.1;
+      this.difficulty += 0.15;
       this.rate = Math.max(this.rate - 20, 30);
     },
     tick: function() {
@@ -876,7 +876,7 @@
       return Fluff.Type.GOOD;
     },
     generateSpeed: function() {
-      var seed = this.difficulty * 0.5;
+      var seed = this.difficulty * 0.7;
       return (Math.random() * seed) + seed;
     }
   };
@@ -1019,7 +1019,7 @@
     tick: function() {
       this.height += this.rate;
       this.y = CANVASHEIGHT - this.height;
-      if(this.height > 110)
+      if(this.height > 125)
         this.raise('WaterFull');
     },
     disable: function() {
@@ -1354,13 +1354,13 @@
       sofaScene.x = 300;
       sofaScene.y = 550;
       var effect = new SofaSceneAnimation(sofaScene);
+      effect.on('Finished', function() {
+        window.location = "success.html";
+      });
       sofaScene.addEffect(effect);
       sofaScene.id = "sofascene";
       sofaScene.addEffect(new FadeInEffect(sofaScene, 60));
       this.scene.add(sofaScene);
-      effect.on('Finished', function() {
-        window.location = "success.html";
-      });
     }
   };
   _.extend(SuccessStory.prototype, Eventable.prototype);
@@ -1383,7 +1383,7 @@
       this.spider = new Spider();
       this.collectedfluff = new CollectedFluff(this.fluffGoal);
       this.floor = new Floor(100);
-      this.floorWater = new FloorWater(this.fluffGoal, 1.0 / 30.0);
+      this.floorWater = new FloorWater(this.fluffGoal, 1.0 / 25.0);
       this.ending = false;
     },
     start: function() {
