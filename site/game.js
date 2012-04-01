@@ -152,6 +152,7 @@
   _.extend(Effect.prototype, Eventable.prototype);
 
   var ConstantRotationEffect = function(quad, speed) {
+    Effect.call(this);
     this.quad = quad;
     this.speed = speed;
   };
@@ -410,19 +411,25 @@
       this.runEffects();
       if(!this.visible) return;
 
+      context.save();
+      context.translate(this.x, this.y);
+      context.rotate(this.rotation);
       context.globalAlpha = this.alpha;
+
       if(this.colour instanceof Image)
         this.renderTexture(context);
       else
         this.renderColour(context);
+      
+      context.restore();
 
     },
     renderTexture: function(context) {
-      context.drawImage(this.colour, this.x, this.y, this.width, this.height);
+      context.drawImage(this.colour, 0, 0, this.width, this.height);
     },
     renderColour: function(context) {
       context.fillStyle = this.colour;
-      context.fillRect(this.x, this.y, this.width, this.height);
+      context.fillRect(0, 0, this.width, this.height);
     },
     runEffects: function() {
       for(var i = 0; i < this.effects.length; i++){
@@ -512,7 +519,7 @@
     chooseGoodQuad: function() {
       var number = Math.floor(Math.random() * 8) + 1;
       this.colour = GlobalResources.getTexture('assets/goodfluff/hair-' + number + '.png');
-      //this.addEffect(new ConstantRotationEffect(0.01));
+      this.addEffect(new ConstantRotationEffect(this, 0.01));
     },
     tick: function() {
       this.currentStrategy();
@@ -621,6 +628,9 @@
   };
 
   FluffGenerator.prototype = {
+    onAddedToScene: function() {
+
+    },
     tick: function() {
       if(this.frame++ % this.rate === 0)
         this.generateFluff();
