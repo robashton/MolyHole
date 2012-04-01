@@ -940,7 +940,8 @@
     Quad.call(this, 80, 80);
     this.x = 700;
     this.y = 625;
-    this.destx = 0;
+    this.destx = 40;
+    this.speedx = 1.0;
     this.id = "spider";
     this.panicking = false;
     this.panickedAnimation = new PanickedSpiderAnimation(this);
@@ -977,8 +978,17 @@
       this.currentStrategy();
     },
     happyStrategy: function() {
-      
+      var difference = this.destx - (this.x + this.width / 2.0);
+      if(Math.abs(difference) < 10)
+        return this.chooseNewDirection();
+      if(difference < 0)
+        this.x -= this.speedx;
+      else
+        this.x += this.speedx;
       this.determineIfWaterIsHigh();
+    },
+    chooseNewDirection: function() {
+      this.destx = (Math.random() * 700) + 50;
     },
     panickedStrategy: function() {
       // Do bugger all
