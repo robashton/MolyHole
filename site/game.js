@@ -14,6 +14,7 @@
      var handlerLength = this.handlers.length;
      for(var i = 0; i < handlerLength; i++) {
         var handler = this.handlers[i];
+        if(!handler) continue;
         handler.method.call(handler.context || this.defaultContext, data, source);   
      }
     },
@@ -243,6 +244,26 @@
   };
   _.extend(WaterfallAnimation.prototype, Effect.prototype);
 
+  var SofaSceneAnimation = function(sofaScene) {
+    Effect.call(this);
+
+    this.sofaScene = sofaScene;
+    this.ticks = 0;
+    this.frame = 0;
+  };
+  SofaSceneAnimation.prototype = {
+    update: function() {
+      this.selectFrame();
+      var id = this.frame % 2 === 0 ? 1 : 2;
+      this.sofaScene.colour = GlobalResources.getTexture('assets/endscene/sofa-' + id + '.png');
+    },
+    selectFrame: function() {
+      if(this.ticks++ % 10 === 0)
+        this.frame++;
+    }
+  };
+  _.extend(SofaSceneAnimation.prototype, Effect.prototype);
+
   var SaddenedSpiderAnimation = function(spider) {
     Effect.call(this);
     this.spider = spider;
@@ -356,6 +377,42 @@
     }
   };
   _.extend(WalkingSpiderAnimation.prototype, Effect.prototype);
+
+  var PanickedSpiderAnimation = function(spider) {
+    Effect.call(this);
+    this.spider = spider;
+    this.enabled = false;
+    this.frame = 0;
+    this.ticks = 0;
+    this.inverse = true;
+  };
+  PanickedSpiderAnimation.prototype = {
+    update: function() {
+      this.selectFrame();
+      if(this.enabled)
+        this.spider.colour = GlobalResources.getTexture('assets/spiderscared/scared-' + this.getFrame() + '.png');
+    },
+    getFrame: function() {
+      var modulus = ((this.frame % 3) + 1);
+      if(this.inverse)
+        modulus = 4 - modulus;
+      return modulus;
+    },
+    selectFrame: function() {
+      if(this.ticks++ % 3 === 0)
+        this.frame++;
+
+      if(this.frame % 3 === 0)
+        this.inverse = this.inverse;
+    },
+    enable: function() {
+      this.enabled = true;
+    },
+    disable: function() {
+      this.enabled = false;
+    }
+  };
+  _.extend(PanickedSpiderAnimation.prototype, Effect.prototype);
 
   var Scene = function() {
     Eventable.call(this);
@@ -472,6 +529,21 @@
       effect.off('Finished', this.onEffectFinished, this); 
       this.effects = _(this.effects).without(effect);
     },
+    queueEffects: function(effects, cb) {
+      var current = 0;
+      var self = this;
+      var nextEffect = function() {
+        if(current >= effects.length) {
+          cb();
+          return;
+        };
+        var effect = effects[current];
+        effect.once("Finished", nextEffect);
+        self.addEffect(effect);
+        current++;
+      };
+      nextEffect();
+    },
     onEffectFinished: function(data, sender) {
       this.removeEffect(sender);
     },   
@@ -527,7 +599,7 @@
     this.physical = true;
     this.direction = 1;
     this.horizontalMotion  = Math.random() * 2.5 + 2.5;
-    this.id = 'fluff-' + Math.random() * 100000;
+    this.id = 'fluff-' + Math.floor(Math.random() * 100000);
     this.generateNewBounds();
     this.currentStrategy = this.driftStrategy;
     this.expireTime = 0;
@@ -754,16 +826,20 @@
     },  
     onRemovedFromScene: function() {
       this.scene.off('TotalFluffChanged', this.onTotalFluffChanged, this);
+      this.scene.withEntity("plughole", _.bind(this.unhookPlugholeEvents, this));
     },
     onTotalFluffChanged: function(fluffCount) {
       this.currentFluff = fluffCount;
       this.resize();
     },
     hookPlugholeEvents: function(plughole) {
-      var self = this;
-      plughole.on('Moved', function() {
-        self.updatePosition();
-      });
+      plughole.on('Moved', this.onPlugholeMoved, this);
+    },
+    unhookPlugholeEvents: function(plughole) {
+      plughole.off('Moved', this.onPlugholeMoved, this);
+    },
+    onPlugholeMoved: function() {
+      this.updatePosition();
     },
     resize: function() {
       var newWidth = this.calculateDesiredWidth();
@@ -844,7 +920,11 @@
     this.x = 700;
     this.y = 625;
     this.id = "spider";
+    this.panicking = false;
+    this.panickedAnimation = new PanickedSpiderAnimation(this);
+    this.addEffect(this.panickedAnimation);
     this.resetAnimations();
+    this.currentStrategy = this.happyStrategy;
   };
 
   Spider.prototype = {
@@ -857,16 +937,42 @@
       this.scene.off('FluffFailure', this.onFluffFailure, this);
     },
     onFluffSuccess: function() {
-      this.addEffect(new CelebratingSpiderAnimation(this));
+      if(!this.panicking)
+        this.addEffect(new CelebratingSpiderAnimation(this));
     },
     onFluffFailure: function() {
-      this.addEffect(new SaddenedSpiderAnimation(this));
+      if(!this.panicking)
+        this.addEffect(new SaddenedSpiderAnimation(this));
     },
     spiderWalking: function() {
       this.addEffect(new WalkingSpiderAnimation(this));
     },
     resetAnimations: function() {
+      this.panickedAnimation.disable();
       this.colour = GlobalResources.getTexture('assets/spiderstatic/staticspider.png');
+    },
+    tick: function() {
+      this.currentStrategy();
+    },
+    happyStrategy: function() {
+      // TODO: Walk around looking for the fluffs
+      
+      this.determineIfWaterIsHigh();
+    },
+    determineIfWaterIsHigh: function() {
+      var self = this;
+      this.scene.withEntity("floorwater", function(water) {
+        if(water.height > 180)
+          this.startPanicking();
+      });
+    },
+    startPanicking: function() {
+      this.currentStrategy = this.panickedStrategy;
+      this.panicking = true;
+      this.panickedAnimation.enable();
+    },
+    panickedStrategy: function() {
+      // Do bugger all
     }
   };
   _.extend(Spider.prototype, Quad.prototype);
@@ -894,6 +1000,7 @@
     document.addEventListener('touchstart', _.bind(this.onTouchStart, this), true);
     document.addEventListener('touchmove', _.bind(this.onTouchMove, this), true);
     document.addEventListener('touchend', _.bind(this.onTouchEnd, this), true);
+    this.enabled = true;
   };
 
   Input.prototype = {
@@ -926,9 +1033,13 @@
       e.preventDefault();
     },
     actionOn: function(x, y) {
+      if(!this.enabled) return;
       this.scene.withEntity("plughole", function(entity) {
         entity.moveTo(x, y);
       });
+    },
+    disable: function() {
+      this.enabled = false;
     },
     pageToCanvas: function(x, y) {
       var offset = this.wrappedElement.offset();
@@ -991,11 +1102,17 @@
           this.height = plughole.height * percentage;
        }, this));
      } 
+    },
+    disable: function() {
+      var effect = new FadeOutEffect(this, 60);
+      effect.on('Finished', this.removeSelfFromScene, this);
+      this.addEffect(effect);
+    },
+    removeSelfFromScene: function() {
+      this.scene.remove(this);
     }
   }
   _.extend(CollectedFluff.prototype, Quad.prototype);
-
-
 
   var ClosingStory = function() {
     Eventable.call(this);
@@ -1003,8 +1120,36 @@
   };
   ClosingStory.prototype = {
     onAddedToScene: function() {
-      // Make spider really happy
-
+      var self = this;
+      this.scene.withEntity("spider", function(spider) {
+        spider.queueEffects(
+          [new CelebratingSpiderAnimation(spider),
+           new CelebratingSpiderAnimation(spider)
+          ], 
+        function() {
+          self.removeSpiderFromScene();
+        });
+      });  
+    },
+    removeSpiderFromScene: function() {
+      var self = this;
+      this.scene.withEntity("spider", function(spider) {
+        var effect = new FadeOutEffect(this, 60);
+        effect.on('Finished', function() {
+          self.scene.remove(spider);
+          self.showEndingScene();
+        });
+        spider.addEffect(effect);
+        spider.addEffect(new CelebratingSpiderAnimation(spider));
+      });
+    },
+    showEndingScene: function() {
+      var sofaScene = new Quad(200, 200);
+      sofaScene.x = 300;
+      sofaScene.y = 550;
+      sofaScene.addEffect(new SofaSceneAnimation(sofaScene));
+      sofaScene.id = "sofascene";
+      this.scene.add(sofaScene);
     }
   };
   _.extend(ClosingStory.prototype, Eventable.prototype);
@@ -1014,9 +1159,8 @@
     this.scene = new Scene();
     this.renderer = new Renderer('game');
     this.input = new Input('game', this.scene);
-    this.fluffGoal = 10;
+    this.fluffGoal = 1;
     this.createEntities();
-    this.hookEntityEvents();
   };
 
   Game.prototype = {
@@ -1028,7 +1172,7 @@
       this.spider = new Spider();
       this.collectedfluff = new CollectedFluff(this.fluffGoal);
       this.floor = new Floor(100);
-      this.floorWater = new FloorWater(this.fluffGoal, 1.0 / 60.0);
+      this.floorWater = new FloorWater(this.fluffGoal, 1.0 / 30.0);
     },
     start: function() {
       this.scene.add(this.fluffgenerator);
@@ -1041,9 +1185,6 @@
       this.scene.add(this.floorWater);
       this.scene.autoHook(this);
       this.startTimers();    
-    },
-    hookEntityEvents: function() {
-      this.scene.on('TotalFluffChanged', this.onTotalFluffChanged, this);
     },
     startTimers: function() {
       var self = this;
@@ -1065,6 +1206,9 @@
       this.scene.remove(this.fluffgenerator);
       this.scene.remove(this.waterfall);
       this.floorWater.disable();
+      this.collectedfluff.disable();
+      this.input.disable();
+      this.plughole.moveTo(340);
       this.scene.withAllEntitiesOfType(Fluff, function(fluff) {
         fluff.disable();
       });
