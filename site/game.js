@@ -14,6 +14,7 @@
      var handlerLength = this.handlers.length;
      for(var i = 0; i < handlerLength; i++) {
         var handler = this.handlers[i];
+        if(!handler) continue;
         handler.method.call(handler.context || this.defaultContext, data, source);   
      }
     },
@@ -500,7 +501,7 @@
     this.physical = true;
     this.direction = 1;
     this.horizontalMotion  = Math.random() * 2.5 + 2.5;
-    this.id = 'fluff-' + Math.random() * 100000;
+    this.id = 'fluff-' + Math.floor(Math.random() * 100000);
     this.generateNewBounds();
     this.currentStrategy = this.driftStrategy;
     this.expireTime = 0;
@@ -727,16 +728,20 @@
     },  
     onRemovedFromScene: function() {
       this.scene.off('TotalFluffChanged', this.onTotalFluffChanged, this);
+      this.scene.withEntity("plughole", _.bind(this.unhookPlugholeEvents, this));
     },
     onTotalFluffChanged: function(fluffCount) {
       this.currentFluff = fluffCount;
       this.resize();
     },
     hookPlugholeEvents: function(plughole) {
-      var self = this;
-      plughole.on('Moved', function() {
-        self.updatePosition();
-      });
+      plughole.on('Moved', this.onPlugholeMoved, this);
+    },
+    unhookPlugholeEvents: function(plughole) {
+      plughole.off('Moved', this.onPlugholeMoved, this);
+    },
+    onPlugholeMoved: function() {
+      this.updatePosition();
     },
     resize: function() {
       var newWidth = this.calculateDesiredWidth();
@@ -864,6 +869,7 @@
     document.addEventListener('touchstart', _.bind(this.onTouchStart, this), true);
     document.addEventListener('touchmove', _.bind(this.onTouchMove, this), true);
     document.addEventListener('touchend', _.bind(this.onTouchEnd, this), true);
+    this.enabled = true;
   };
 
   Input.prototype = {
@@ -896,9 +902,13 @@
       e.preventDefault();
     },
     actionOn: function(x, y) {
+      if(!this.enabled) return;
       this.scene.withEntity("plughole", function(entity) {
         entity.moveTo(x, y);
       });
+    },
+    disable: function() {
+      this.enabled = false;
     },
     pageToCanvas: function(x, y) {
       var offset = this.wrappedElement.offset();
@@ -961,11 +971,17 @@
           this.height = plughole.height * percentage;
        }, this));
      } 
+    },
+    disable: function() {
+      var effect = new FadeOutEffect(this, 60);
+      effect.on('Finished', this.removeSelfFromScene, this);
+      this.addEffect(effect);
+    },
+    removeSelfFromScene: function() {
+      this.scene.remove(this);
     }
   }
   _.extend(CollectedFluff.prototype, Quad.prototype);
-
-
 
   var ClosingStory = function() {
     Eventable.call(this);
@@ -984,9 +1000,8 @@
     this.scene = new Scene();
     this.renderer = new Renderer('game');
     this.input = new Input('game', this.scene);
-    this.fluffGoal = 10;
+    this.fluffGoal = 1;
     this.createEntities();
-    this.hookEntityEvents();
   };
 
   Game.prototype = {
@@ -1012,9 +1027,6 @@
       this.scene.autoHook(this);
       this.startTimers();    
     },
-    hookEntityEvents: function() {
-      this.scene.on('TotalFluffChanged', this.onTotalFluffChanged, this);
-    },
     startTimers: function() {
       var self = this;
       setInterval(function() {
@@ -1035,6 +1047,9 @@
       this.scene.remove(this.fluffgenerator);
       this.scene.remove(this.waterfall);
       this.floorWater.disable();
+      this.collectedfluff.disable();
+      this.input.disable();
+      this.plughole.moveTo(340);
       this.scene.withAllEntitiesOfType(Fluff, function(fluff) {
         fluff.disable();
       });
