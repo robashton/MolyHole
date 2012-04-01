@@ -181,6 +181,23 @@
   };
   _.extend(FadeOutEffect.prototype, Effect.prototype);
 
+  var FadeInEffect = function(quad, frames) {
+    Effect.call(this);
+
+    this.frames = frames;
+    this.quad = quad;
+    this.frameCount = 0;
+  };
+  FadeInEffect.prototype = {
+    update: function() {
+      this.frameCount++;
+      this.quad.alpha = Math.max((this.frameCount / this.frames), 0.0);
+      if(this.frameCount >= this.frames)
+        this.raise('Finished');
+    }
+  };
+  _.extend(FadeInEffect.prototype, Effect.prototype);
+
   var FadeInAndOutEffect = function(quad, frames) {
     Effect.call(this);
     this.quad = quad;
@@ -876,7 +893,7 @@
       this.y = CANVASHEIGHT - this.height;
     },
     disable: function() {
-      var effect = new FadeOutEffect(this, 60);
+      var effect = new FadeOutEffect(this, 120);
       effect.on('Finished', this.removeSelfFromScene, this);
       this.addEffect(effect);
     },
@@ -931,8 +948,8 @@
     determineIfWaterIsHigh: function() {
       var self = this;
       this.scene.withEntity("floorwater", function(water) {
-        if(water.height > 180)
-          this.startPanicking();
+        if(water.height > 85)
+          self.startPanicking();
       });
     },
     startPanicking: function() {
@@ -1103,7 +1120,7 @@
     removeSpiderFromScene: function() {
       var self = this;
       this.scene.withEntity("spider", function(spider) {
-        var effect = new FadeOutEffect(this, 60);
+        var effect = new FadeOutEffect(spider, 120);
         effect.on('Finished', function() {
           self.scene.remove(spider);
           self.showEndingScene();
@@ -1118,6 +1135,7 @@
       sofaScene.y = 550;
       sofaScene.addEffect(new SofaSceneAnimation(sofaScene));
       sofaScene.id = "sofascene";
+      sofaScene.addEffect(new FadeInEffect(sofaScene, 60));
       this.scene.add(sofaScene);
     }
   };
