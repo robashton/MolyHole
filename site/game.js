@@ -530,6 +530,9 @@
       if((middle < this.min && this.direction < 0) || (middle > this.max && this.direction > 0))
         this.switchDirection();
     },
+    disable: function() {
+      this.switchToExpiredStrategy();
+    },
     switchDirection: function() {
       this.direction = -this.direction;
       this.generateNewBounds();
@@ -632,6 +635,9 @@
     onAddedToScene: function() {
       this.scene.on('FluffSuccess', this.onFluffSuccess, this);
     },
+    onRemovedFromScene: function() {
+      this.scene.off('FluffSuccess', this.onFluffSuccess, this);
+    },
     onFluffSuccess: function() {
       this.difficulty += 0.1;
       this.rate = Math.max(this.rate - 20, 30);
@@ -719,6 +725,9 @@
       this.width = this.calculateDesiredWidth();
       this.updatePosition();
     },  
+    onRemovedFromScene: function() {
+      this.scene.off('TotalFluffChanged', this.onTotalFluffChanged, this);
+    },
     onTotalFluffChanged: function(fluffCount) {
       this.currentFluff = fluffCount;
       this.resize();
@@ -777,6 +786,9 @@
     onAddedToScene: function() {
       this.scene.on('TotalFluffChanged', this.onTotalFluffChanged, this);
     },
+    onRemovedFromScene: function() {
+      this.scene.off('TotalFluffChanged', this.onTotalFluffChanged, this);
+    },
     onTotalFluffChanged: function(fluffCount) {
       this.currentFluff = fluffCount;
       this.calculateNewRate();
@@ -787,6 +799,14 @@
     tick: function() {
       this.height += this.rate;
       this.y = CANVASHEIGHT - this.height;
+    },
+    disable: function() {
+      var effect = new FadeOutEffect(this, 60);
+      effect.on('Finished', this.removeSelfFromScene, this);
+      this.addEffect(effect);
+    },
+    removeSelfFromScene: function() {
+      this.scene.remove(this);
     }
   };
 
@@ -804,6 +824,10 @@
     onAddedToScene: function() {
       this.scene.on('FluffSuccess', this.onFluffSuccess, this);
       this.scene.on('FluffFailure', this.onFluffFailure, this);
+    },
+    onRemovedFromScene: function() {
+      this.scene.off('FluffSuccess', this.onFluffSuccess, this);
+      this.scene.off('FluffFailure', this.onFluffFailure, this);
     },
     onFluffSuccess: function() {
       this.addEffect(new CelebratingSpiderAnimation(this));
@@ -836,6 +860,7 @@
     this.wrappedElement.on({
       click: _.bind(this.onClick, this)
     });
+    document.addEventListener('keydown', _.bind(this.onKeyDown, this), true);
     document.addEventListener('touchstart', _.bind(this.onTouchStart, this), true);
     document.addEventListener('touchmove', _.bind(this.onTouchMove, this), true);
     document.addEventListener('touchend', _.bind(this.onTouchEnd, this), true);
@@ -844,6 +869,13 @@
   Input.prototype = {
     onClick: function(e) {
       this.actionOn(e.clientX, e.clientY);
+    },
+    onKeyDown: function(e) {
+      if(e.keyCode === 37)
+        this.actionOn(0, 0);
+      else if(e.keyCode === 39)
+        this.actionOn(800, 0);
+      return false;
     },
     onTouchStart: function(e) {
       if(!e) var e = event;
@@ -888,6 +920,10 @@
     onAddedToScene: function(){
       this.scene.on('FluffSuccess', this.onFluffSuccess, this);
       this.scene.on('FluffFailure', this.onFluffFailure, this);
+    },
+    onRemovedFromScene: function() {
+      this.scene.off('FluffSuccess', this.onFluffSuccess, this);
+      this.scene.off('FluffFailure', this.onFluffFailure, this);
     },
     onFluffSuccess: function() {
       this.count++;
@@ -996,6 +1032,9 @@
         this.transitionToGameCompletion();
     },
     transitionToGameCompletion: function() {
+      this.scene.remove(this.fluffgenerator);
+      this.scene.remove(this.waterfall);
+      this.floorWater.disable();
       this.scene.withAllEntitiesOfType(Fluff, function(fluff) {
         fluff.disable();
       });
