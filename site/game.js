@@ -1383,7 +1383,7 @@
       this.spider = new Spider();
       this.collectedfluff = new CollectedFluff(this.fluffGoal);
       this.floor = new Floor(100);
-      this.floorWater = new FloorWater(this.fluffGoal, 1.0 / 25.0);
+      this.floorWater = new FloorWater(this.fluffGoal, 1.0 / 30.0);
       this.ending = false;
     },
     start: function() {
