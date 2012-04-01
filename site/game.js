@@ -367,6 +367,34 @@
   };
   _.extend(CelebratingSpiderAnimation.prototype, Effect.prototype);
 
+  var WalkingSpiderAnimation = function(spider) {
+    Effect.call(this);
+    this.spider = spider;
+    this.tick = 0;
+    this.frame = 1;
+  };
+  WalkingSpiderAnimation.prototype = {
+    update: function() {
+      this.selectFrame();
+      this.showFrame(this.frame);
+    },
+    selectFrame: function() {
+      if(this.tick++ % 5 === 0) {
+        this.frame++;
+      }
+    },
+    showFrame: function(frame) {
+      this.spider.colour = GlobalResources.getTexture('assets/spiderwalk/walk-' + frame%8 + '.png');
+    },
+    start: function() {
+      
+    },
+    stop: function() {
+      
+    }
+  };
+  _.extend(WalkingSpiderAnimation.prototype, Effect.prototype);
+
   var PanickedSpiderAnimation = function(spider) {
     Effect.call(this);
     this.spider = spider;
@@ -932,6 +960,9 @@
     onFluffFailure: function() {
       if(!this.panicking)
         this.addEffect(new SaddenedSpiderAnimation(this));
+    },
+    spiderWalking: function() {
+      this.addEffect(new WalkingSpiderAnimation(this));
     },
     resetAnimations: function() {
       this.panickedAnimation.disable();
