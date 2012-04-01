@@ -623,14 +623,18 @@
 
     this.scene = null;
     this.id = "fluffgenerator";
-    this.rate = 180;
+    this.rate = 240;
     this.frame = 0;
     this.difficulty = 0.5;
   };
 
   FluffGenerator.prototype = {
     onAddedToScene: function() {
-
+      this.scene.on('FluffSuccess', this.onFluffSuccess, this);
+    },
+    onFluffSuccess: function() {
+      this.difficulty += 0.1;
+      this.rate = Math.max(this.rate - 20, 30);
     },
     tick: function() {
       if(this.frame++ % this.rate === 0)
