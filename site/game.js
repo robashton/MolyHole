@@ -242,6 +242,47 @@
   };
   _.extend(ResizeWaterfallEffect.prototype, Effect.prototype);
 
+  var DrowningSpiderAnimation = function(spider) {
+    Effect.call(this);
+    this.spider = spider;
+    this.ticks = 0;
+    this.frames = 1;
+    this.destination = 0;
+    this.speed = 3.0;
+    this.calculateDestination();
+  };
+  DrowningSpiderAnimation.prototype = {
+    update: function() {
+      this.updateFrame();
+      this.updatePosition();
+      this.updateImage();
+    },
+    updateImage: function() {
+      var id = (this.frames % 2) + 1;
+      this.spider.colour = GlobalResources.getTexture('assets/spiderscared/scared-' + id + '.png');
+    },
+    updateFrame: function() {
+      if(this.ticks++ % 3 === 0)
+        this.frames++;
+    },
+    updatePosition: function() {
+      if(this.destination < this.spider.x)
+        this.spider.x -= this.speed;
+      else if(this.destination > this.spider.x)
+        this.spider.x += this.speed;
+
+      if(Math.abs(this.spider.x - this.destination) < 20)
+        this.raise('Finished');
+    },
+    calculateDestination: function() {
+      if(800 - this.spider.x > 400)
+        this.destination = 1000;
+      else
+        this.destination = -200; 
+    }
+  };
+  _.extend(DrowningSpiderAnimation.prototype, Effect.prototype);
+
   var WaterfallAnimation = function(quad) {
     Effect.call(this);
     this.quad = quad;
@@ -498,6 +539,11 @@
       entity.offAny(this.onEntityEvent, this);
       if(entity.onRemovedFromScene) entity.onRemovedFromScene();
       entity.scene = null;
+    },
+    removeWithId: function(id) {
+      var entity = this.entities[id];
+      if(entity)
+        this.remove(entity);
     },
     render: function(context) {
       this.each(function(entity) {
@@ -970,7 +1016,7 @@
     tick: function() {
       this.height += this.rate;
       this.y = CANVASHEIGHT - this.height;
-      if(this.height > 100)
+      if(this.height > 85)
         this.raise('WaterFull');
     },
     disable: function() {
@@ -992,7 +1038,7 @@
     this.destx = 40;
     this.speedx = 1.0;
     this.id = "spider";
-    this.panicking = false;
+    this.finished = false;
     this.animating = false;
     this.panickedAnimation = new PanickedSpiderAnimation(this);
     this.walkingAnimation = new WalkingSpiderAnimation(this);
@@ -1013,11 +1059,11 @@
       this.scene.off('FluffFailure', this.onFluffFailure, this);
     },
     onFluffSuccess: function() {
-      if(!this.panicking)
+      if(!this.finished)
         this.playNonDefaultAnimation(new CelebratingSpiderAnimation(this));
     },
     onFluffFailure: function() {
-      if(!this.panicking)
+      if(!this.finished)
         this.playNonDefaultAnimation(new SaddenedSpiderAnimation(this));
     },
     resetAnimations: function() {
@@ -1049,6 +1095,9 @@
     panickedStrategy: function() {
       // Do bugger all
     },
+    drowningStrategy: function() {
+      // Do bugger all
+    },
     playNonDefaultAnimation: function(animation) {
       if(this.animating) return;
       this.stopDefaultAnimation();
@@ -1060,7 +1109,7 @@
       this.addEffect(animation);
     },
     startDefaultAnimation: function() {
-      if(this.panicking) return;
+      if(this.finished) return;
       this.walkingAnimation.enable();
     },
     stopDefaultAnimation: function() {
@@ -1085,8 +1134,19 @@
     },
     startPanicking: function() {
       this.currentStrategy = this.panickedStrategy;
-      this.panicking = true;
+      this.finished = true;
       this.panickedAnimation.enable();
+    },
+    drown: function() {
+      this.finished = true;
+      this.currentStrategy = this.drowningStrategy;
+      var effect = new DrowningSpiderAnimation(this);
+      effect.on('Finished', this.onFinishedDrowning, this);
+      this.addEffect(effect);
+    },
+    onFinishedDrowning: function() {
+      this.raise('Drowned');
+      this.scene.remove(this);
     }
   };
   _.extend(Spider.prototype, Quad.prototype);
@@ -1229,11 +1289,45 @@
   }
   _.extend(CollectedFluff.prototype, Quad.prototype);
 
-  var ClosingStory = function() {
+  var FailureStory = function() {
     Eventable.call(this);
-    this.id = "closingstory";
+    this.id = "FailureStory";
   };
-  ClosingStory.prototype = {
+  FailureStory.prototype = {
+    onAddedToScene: function() {
+      var self = this;
+      this.scene.withEntity("spider", function(spider) {
+        spider.on('Drowned', self.hideSceneryObjects, self);
+        spider.drown();
+      }); 
+    },
+    hideSceneryObjects: function() {
+      this.scene.removeWithId("waterfall");
+      this.scene.withEntity("floorwater", function(floorwater) {
+        floorwater.disable();
+      });
+      this.scene.withEntity("collectedfluff", function(collectedfluff){
+        collectedfluff.disable();
+      });
+      this.showEndingScene();
+    },
+    showEndingScene: function() {
+      var sofaScene = new Quad(200, 200);
+      sofaScene.x = 300;
+      sofaScene.y = 550;
+      sofaScene.id = "funeralscene";
+      sofaScene.colour = '#FF0'; // TODO:Replace with graphic from Jo 
+      sofaScene.addEffect(new FadeInEffect(sofaScene, 60));
+      this.scene.add(sofaScene);      
+    }
+  };
+  _.extend(FailureStory.prototype, Eventable.prototype);
+
+  var SuccessStory = function() {
+    Eventable.call(this);
+    this.id = "SuccessStory";
+  };
+  SuccessStory.prototype = {
     onAddedToScene: function() {
       var self = this;
       this.scene.withEntity("spider", function(spider) {
@@ -1268,7 +1362,7 @@
       this.scene.add(sofaScene);
     }
   };
-  _.extend(ClosingStory.prototype, Eventable.prototype);
+  _.extend(SuccessStory.prototype, Eventable.prototype);
 
 
   var Game = function() {
@@ -1325,9 +1419,17 @@
       this.transitionToGameFailure();
     },
     transitionToGameFailure: function() {
-
+      this.ending = true;
+      this.scene.remove(this.fluffgenerator);
+      this.scene.withAllEntitiesOfType(Fluff, function(fluff) {
+        fluff.disable();
+      });
+      this.input.disable();
+      this.plughole.moveTo(340);
+      this.scene.add(new FailureStory());
     },
     transitionToGameCompletion: function() {
+      this.ending = true;
       this.scene.remove(this.fluffgenerator);
       this.scene.remove(this.waterfall);
       this.floorWater.disable();
@@ -1337,7 +1439,7 @@
       this.scene.withAllEntitiesOfType(Fluff, function(fluff) {
         fluff.disable();
       });
-      this.scene.add(new ClosingStory());
+      this.scene.add(new SuccessStory());
     }
   };
 
