@@ -1,3 +1,4 @@
+
 (function(exports) {
   var CANVASWIDTH = 800;
   var CANVASHEIGHT = 800;
@@ -211,13 +212,13 @@
   };
   _.extend(ResizeWaterfallEffect.prototype, Effect.prototype);
 
-  var WaterfallAnimationEffect = function(quad) {
+  var WaterfallAnimation = function(quad) {
     Effect.call(this);
     this.quad = quad;
     this.frame = 1;
     this.maxFrames = 3;
   };
-  WaterfallAnimationEffect.prototype = {
+  WaterfallAnimation.prototype = {
     update: function() {
       this.nextFrame();
     },
@@ -228,7 +229,94 @@
       this.quad.colour = GlobalResources.getTexture('assets/waterfall/' + this.frame + '.png');
     }
   };
-  _.extend(WaterfallAnimationEffect.prototype, Effect.prototype);
+  _.extend(WaterfallAnimation.prototype, Effect.prototype);
+
+  var SaddenedSpiderAnimation = function(spider) {
+    Effect.call(this);
+    this.spider = spider;
+    this.tick = 0;
+    this.frame = 1;
+  };
+  SaddenedSpiderAnimation.prototype = {
+    update: function() {
+      this.selectFrame();
+      if(this.frame <= 4)
+        this.showFrame(this.frame);
+      else if (this.frame <= 8)
+        this.wibbleForFrame(this.frame);
+      else if (this.frame < 12)
+        this.unwindAnimationForFrame(this.frame)
+      else
+        this.end();
+    },
+    showFrame: function(frame) {
+      this.spider.colour = GlobalResources.getTexture('assets/spidersad/sad-' + frame + '.png');
+    },
+    wibbleForFrame: function(frame) {
+      var odd = frame % 2;
+      if(odd === 0)
+        this.showFrame(4)
+      else
+        this.showFrame(3);
+    },
+    unwindAnimationForFrame: function(frame) {
+      var unwound = (12 - frame);
+      this.showFrame(unwound); 
+    },
+    end: function() {
+      this.spider.resetAnimations();
+      this.raise('Finished');
+    },
+    selectFrame: function() {
+      if(this.tick++ % 5 == 0)
+        this.frame++; 
+    }
+  };
+  _.extend(SaddenedSpiderAnimation.prototype, Effect.prototype);
+
+  var CelebratingSpiderAnimation = function(spider) {
+    Effect.call(this);
+    this.spider = spider;
+    this.tick = 0;
+    this.frame = 1;
+  };
+  CelebratingSpiderAnimation.prototype = {
+    update: function() {
+      this.selectFrame();
+      if(this.frame <= 5)
+        this.showFrame(this.frame);
+      else if(this.frame <= 15)
+        this.waveArmsForFrame(this.frame);
+      else if(this.frame < 20)
+        this.unwindAnimationForFrame(this.frame);
+      else
+        this.end();
+    },
+    selectFrame: function() {
+      if(this.tick++ % 5 == 0)
+        this.frame++;
+    },
+    showFrame: function(frame) {
+      this.spider.colour = GlobalResources.getTexture('assets/spiderhappy/happy-' + frame + '.png');
+    },
+    waveArmsForFrame: function(frame) {
+      var odd = frame % 2;
+      if(odd === 0)
+        this.showFrame(4);
+      else
+        this.showFrame(5);
+    },
+    unwindAnimationForFrame: function(frame) {
+      var unwound = (20 - frame);
+      this.showFrame(unwound);
+    },
+    end: function() {
+      this.spider.resetAnimations()
+      this.raise('Finished');
+    },
+  };
+  _.extend(CelebratingSpiderAnimation.prototype, Effect.prototype);
+
 
   var Scene = function() {
     Eventable.call(this);
@@ -524,7 +612,7 @@
   _.extend(FluffGenerator.prototype, Eventable.prototype);
 
   var Plughole = function() {
-    Quad.call(this, 80, 20, GlobalResources.getTexture('assets/PlugHole.png'));
+    Quad.call(this, 80, 20, GlobalResources.getTexture('assets/plughole/plughole.png'));
     Eventable.call(this);
 
     this.x = 360;
@@ -573,22 +661,17 @@
     this.id = "waterfall";
     this.fluffGoal = fluffGoal;
     this.currentFluff = 0;
-    this.addEffect(new WaterfallAnimationEffect(this));
+    this.addEffect(new WaterfallAnimation(this));
   };
   Waterfall.prototype = {
     onAddedToScene: function() {
-      this.scene.on('FluffSuccess', this.onFluffSuccess, this);
-      this.scene.on('FluffFailure', this.onFluffFailure, this);
+      this.scene.on('TotalFluffChanged', this.onTotalFluffChanged, this);
       this.scene.withEntity("plughole", _.bind(this.hookPlugholeEvents, this));
       this.width = this.calculateDesiredWidth();
       this.updatePosition();
     },  
-    onFluffSuccess: function() {
-      this.currentFluff++;
-      this.resize();
-    },
-    onFluffFailure: function() {
-      this.currentFluff--;
+    onTotalFluffChanged: function(fluffCount) {
+      this.currentFluff = fluffCount;
       this.resize();
     },
     hookPlugholeEvents: function(plughole) {
@@ -643,15 +726,10 @@
 
   FloorWater.prototype = {
     onAddedToScene: function() {
-      this.scene.on('FluffSuccess', this.onFluffSuccess, this);
-      this.scene.on('FluffFailure', this.onFluffFailure, this);
+      this.scene.on('TotalFluffChanged', this.onTotalFluffChanged, this);
     },
-    onFluffSuccess: function() {
-      this.currentFluff++;
-      this.calculateNewRate();
-    },
-    onFluffFailure: function() {
-      this.currentFluff--;
+    onTotalFluffChanged: function(fluffCount) {
+      this.currentFluff = fluffCount;
       this.calculateNewRate();
     },
     calculateNewRate: function() {
@@ -666,14 +744,27 @@
   _.extend(FloorWater.prototype, Quad.prototype);
 
   var Spider = function() {
-    Quad.call(this, 60, 60, GlobalResources.getTexture('assets/Spider 1.png'));
+    Quad.call(this, 60, 60);
     this.x = 730;
     this.y = 640;
     this.id = "spider";
+    this.resetAnimations();
   };
 
   Spider.prototype = {
-
+    onAddedToScene: function() {
+      this.scene.on('FluffSuccess', this.onFluffSuccess, this);
+      this.scene.on('FluffFailure', this.onFluffFailure, this);
+    },
+    onFluffSuccess: function() {
+      this.addEffect(new CelebratingSpiderAnimation(this));
+    },
+    onFluffFailure: function() {
+      this.addEffect(new SaddenedSpiderAnimation(this));
+    },
+    resetAnimations: function() {
+      this.colour = GlobalResources.getTexture('assets/spiderstatic/staticspider.png');
+    }
   };
   _.extend(Spider.prototype, Quad.prototype);
 
@@ -752,10 +843,12 @@
     onFluffSuccess: function() {
       this.count++;
       this.resize();
+      this.raise('TotalFluffChanged', this.count);
     },
     onFluffFailure: function() {
       this.count--;
       this.resize();
+      this.raise('TotalFluffChanged', this.count);
     },
     tick: function() {
       this.scene.withEntity("plughole", _.bind(function(plughole) {
@@ -787,12 +880,28 @@
   }
   _.extend(CollectedFluff.prototype, Quad.prototype);
 
+
+
+  var ClosingStory = function() {
+    Eventable.call(this);
+    this.id = "closingstory";
+  };
+  ClosingStory.prototype = {
+    onAddedToScene: function() {
+      // Make spider really happy
+
+    }
+  };
+  _.extend(ClosingStory.prototype, Eventable.prototype);
+
+
   var Game = function() {
     this.scene = new Scene();
     this.renderer = new Renderer('game');
     this.input = new Input('game', this.scene);
     this.fluffGoal = 10;
     this.createEntities();
+    this.hookEntityEvents();
   };
 
   Game.prototype = {
@@ -816,7 +925,10 @@
       this.scene.add(this.waterfall);
       this.scene.add(this.floorWater);
       this.scene.autoHook(this);
-      this.startTimers();      
+      this.startTimers();    
+    },
+    hookEntityEvents: function() {
+      this.scene.on('TotalFluffChanged', this.onTotalFluffChanged, this);
     },
     startTimers: function() {
       var self = this;
@@ -829,6 +941,16 @@
       this.scene.tick();
       this.renderer.clear();
       this.scene.render(this.renderer.context);
+    },
+    onTotalFluffChanged: function(fluffCount) {
+      if(fluffCount >= this.fluffGoal) 
+        this.transitionToGameCompletion();
+    },
+    transitionToGameCompletion: function() {
+      this.scene.withAllEntitiesOfType(Fluff, function(fluff) {
+        fluff.disable();
+      });
+      this.scene.add(new ClosingStory());
     }
   };
 
