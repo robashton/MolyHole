@@ -1167,6 +1167,7 @@
     this.visible = false;
     this.count = 0;
     this.maxCount = maxCount;
+    this.colour = GlobalResources.getTexture('assets/plughole/fluffpile.png');
   };
   CollectedFluff.prototype = {
     onAddedToScene: function(){
