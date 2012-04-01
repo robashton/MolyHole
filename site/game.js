@@ -370,6 +370,7 @@
   var WalkingSpiderAnimation = function(spider) {
     Effect.call(this);
     this.spider = spider;
+    this.enabled = false;
     this.tick = 0;
     this.frame = 1;
   };
@@ -384,13 +385,14 @@
       }
     },
     showFrame: function(frame) {
+      if(!this.enabled) return;
       this.spider.colour = GlobalResources.getTexture('assets/spiderwalk/walk-' + frame%8 + '.png');
     },
-    start: function() {
-      
+    enable: function() {
+      this.enabled = true;
     },
-    stop: function() {
-      
+    disable: function() {
+      this.enabled = false;
     }
   };
   _.extend(WalkingSpiderAnimation.prototype, Effect.prototype);
@@ -631,7 +633,9 @@
         this.chooseGoodQuad();
     },
     chooseBadQuad: function() {
-      this.colour = '#000';
+      var number = Math.floor(Math.random() * 3) + 1;
+      this.colour = GlobalResources.getTexture('assets/badfluff/bleach-' + number + '.png');
+      this.addEffect(new ConstantRotationEffect(this, (Math.random() * 0.5) - 0.25));
     },
     chooseGoodQuad: function() {
       var number = Math.floor(Math.random() * 8) + 1;
@@ -936,12 +940,16 @@
     Quad.call(this, 80, 80);
     this.x = 700;
     this.y = 625;
+    this.destx = 0;
     this.id = "spider";
     this.panicking = false;
     this.panickedAnimation = new PanickedSpiderAnimation(this);
+    this.walkingAnimation = new WalkingSpiderAnimation(this);
+    this.addEffect(this.walkingAnimation);
     this.addEffect(this.panickedAnimation);
     this.resetAnimations();
     this.currentStrategy = this.happyStrategy;
+    this.startDefaultAnimation();
   };
 
   Spider.prototype = {
@@ -955,14 +963,11 @@
     },
     onFluffSuccess: function() {
       if(!this.panicking)
-        this.addEffect(new CelebratingSpiderAnimation(this));
+        this.playNonDefaultAnimation(new CelebratingSpiderAnimation(this));
     },
     onFluffFailure: function() {
       if(!this.panicking)
-        this.addEffect(new SaddenedSpiderAnimation(this));
-    },
-    spiderWalking: function() {
-      this.addEffect(new WalkingSpiderAnimation(this));
+        this.playNonDefaultAnimation(new SaddenedSpiderAnimation(this));
     },
     resetAnimations: function() {
       this.panickedAnimation.disable();
@@ -972,9 +977,24 @@
       this.currentStrategy();
     },
     happyStrategy: function() {
-      // TODO: Walk around looking for the fluffs
       
       this.determineIfWaterIsHigh();
+    },
+    panickedStrategy: function() {
+      // Do bugger all
+    },
+    playNonDefaultAnimation: function(animation) {
+      this.stopDefaultAnimation();
+      animation.on('Finished', function() {
+        this.startDefaultAnimation();
+      }, this);
+      this.addEffect(animation);
+    },
+    startDefaultAnimation: function() {
+      this.walkingAnimation.enable();
+    },
+    stopDefaultAnimation: function() {
+      this.walkingAnimation.disable();
     },
     determineIfWaterIsHigh: function() {
       var self = this;
@@ -987,9 +1007,6 @@
       this.currentStrategy = this.panickedStrategy;
       this.panicking = true;
       this.panickedAnimation.enable();
-    },
-    panickedStrategy: function() {
-      // Do bugger all
     }
   };
   _.extend(Spider.prototype, Quad.prototype);
@@ -1177,7 +1194,7 @@
     this.scene = new Scene();
     this.renderer = new Renderer('game');
     this.input = new Input('game', this.scene);
-    this.fluffGoal = 1;
+    this.fluffGoal = 10;
     this.createEntities();
   };
 
