@@ -1,3 +1,8 @@
 body {
   background-color: #000;
 }
+
+#description {
+  background-color: #EEE;
+  padding: 10px 10px 10px 10px;
+}

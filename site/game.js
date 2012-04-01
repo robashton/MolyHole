@@ -311,6 +311,9 @@
   };
   SofaSceneAnimation.prototype = {
     update: function() {
+      if((this.ticks / 30) > 5) {
+        this.raise('Finished');
+      }
       this.selectFrame();
       var id = this.frame % 2 === 0 ? 1 : 2;
       this.sofaScene.colour = GlobalResources.getTexture('assets/endscene/sofa-' + id + '.png');
@@ -1016,7 +1019,7 @@
     tick: function() {
       this.height += this.rate;
       this.y = CANVASHEIGHT - this.height;
-      if(this.height > 85)
+      if(this.height > 110)
         this.raise('WaterFull');
     },
     disable: function() {
@@ -1312,13 +1315,7 @@
       this.showEndingScene();
     },
     showEndingScene: function() {
-      var sofaScene = new Quad(200, 200);
-      sofaScene.x = 300;
-      sofaScene.y = 550;
-      sofaScene.id = "funeralscene";
-      sofaScene.colour = '#FF0'; // TODO:Replace with graphic from Jo 
-      sofaScene.addEffect(new FadeInEffect(sofaScene, 60));
-      this.scene.add(sofaScene);      
+      window.location = 'failure.html';      
     }
   };
   _.extend(FailureStory.prototype, Eventable.prototype);
@@ -1356,10 +1353,14 @@
       var sofaScene = new Quad(200, 200);
       sofaScene.x = 300;
       sofaScene.y = 550;
-      sofaScene.addEffect(new SofaSceneAnimation(sofaScene));
+      var effect = new SofaSceneAnimation(sofaScene);
+      sofaScene.addEffect(effect);
       sofaScene.id = "sofascene";
       sofaScene.addEffect(new FadeInEffect(sofaScene, 60));
       this.scene.add(sofaScene);
+      effect.on('Finished', function() {
+        window.location = "success.html";
+      });
     }
   };
   _.extend(SuccessStory.prototype, Eventable.prototype);
