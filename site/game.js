@@ -1058,6 +1058,7 @@
       this.addEffect(animation);
     },
     startDefaultAnimation: function() {
+      if(this.panicking) return;
       this.walkingAnimation.enable();
     },
     stopDefaultAnimation: function() {
