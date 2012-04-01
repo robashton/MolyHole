@@ -970,6 +970,8 @@
     tick: function() {
       this.height += this.rate;
       this.y = CANVASHEIGHT - this.height;
+      if(this.height > 100)
+        this.raise('WaterFull');
     },
     disable: function() {
       var effect = new FadeOutEffect(this, 120);
@@ -1287,6 +1289,7 @@
       this.collectedfluff = new CollectedFluff(this.fluffGoal);
       this.floor = new Floor(100);
       this.floorWater = new FloorWater(this.fluffGoal, 1.0 / 30.0);
+      this.ending = false;
     },
     start: function() {
       this.scene.add(this.fluffgenerator);
@@ -1298,6 +1301,7 @@
       this.scene.add(this.waterfall);
       this.scene.add(this.floorWater);
       this.scene.autoHook(this);
+
       this.startTimers();    
     },
     startTimers: function() {
@@ -1315,6 +1319,13 @@
     onTotalFluffChanged: function(fluffCount) {
       if(fluffCount >= this.fluffGoal) 
         this.transitionToGameCompletion();
+    },
+    onWaterFull: function() {
+      if(this.ending) return;
+      this.transitionToGameFailure();
+    },
+    transitionToGameFailure: function() {
+
     },
     transitionToGameCompletion: function() {
       this.scene.remove(this.fluffgenerator);
