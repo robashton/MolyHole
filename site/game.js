@@ -1,3 +1,4 @@
+
 (function(exports) {
   var CANVASWIDTH = 800;
   var CANVASHEIGHT = 800;
@@ -229,6 +230,50 @@
     }
   };
   _.extend(WaterfallAnimation.prototype, Effect.prototype);
+
+
+  var CelebratingSpiderAnimation = function(spider) {
+    Effect.call(this);
+    this.spider = spider;
+    this.tick = 0;
+    this.frame = 1;
+  };
+  CelebratingSpiderAnimation.prototype = {
+    update: function() {
+      this.selectFrame();
+      if(this.frame <= 5)
+        this.showFrame(this.frame);
+      else if(this.frame <= 15)
+        this.waveArmsForFrame(this.frame);
+      else if(this.frame < 20)
+        this.unwindAnimationForFrame(this.frame);
+      else
+        this.end();
+    },
+    selectFrame: function() {
+      if(this.tick++ % 5 == 0)
+        this.frame++;
+    },
+    showFrame: function(frame) {
+      this.spider.colour = GlobalResources.getTexture('assets/spiderhappy/happy-' + frame + '.png');
+    },
+    waveArmsForFrame: function(frame) {
+      var odd = frame % 2;
+      if(odd === 0)
+        this.showFrame(4);
+      else
+        this.showFrame(5);
+    },
+    unwindAnimationForFrame: function(frame) {
+      var unwound = (20 - frame);
+      this.showFrame(unwound);
+    },
+    end: function() {
+      this.raise('Finished');
+    },
+  };
+  _.extend(CelebratingSpiderAnimation.prototype, Effect.prototype);
+
 
   var Scene = function() {
     Eventable.call(this);
@@ -663,7 +708,12 @@
   };
 
   Spider.prototype = {
-
+    onAddedToScene: function() {
+      this.scene.on('FluffSuccess', this.onFluffSuccess, this);
+    },
+    onFluffSuccess: function() {
+      this.addEffect(new CelebratingSpiderAnimation(this));
+    }
   };
   _.extend(Spider.prototype, Quad.prototype);
 
