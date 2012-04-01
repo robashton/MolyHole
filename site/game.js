@@ -244,6 +244,26 @@
   };
   _.extend(WaterfallAnimation.prototype, Effect.prototype);
 
+  var SofaSceneAnimation = function(sofaScene) {
+    Effect.call(this);
+
+    this.sofaScene = sofaScene;
+    this.ticks = 0;
+    this.frame = 0;
+  };
+  SofaSceneAnimation.prototype = {
+    update: function() {
+      this.selectFrame();
+      var id = this.frame % 2 === 0 ? 1 : 2;
+      this.sofaScene.colour = GlobalResources.getTexture('assets/endscene/sofa-' + id + '.png');
+    },
+    selectFrame: function() {
+      if(this.ticks++ % 10 === 0)
+        this.frame++;
+    }
+  };
+  _.extend(SofaSceneAnimation.prototype, Effect.prototype);
+
   var SaddenedSpiderAnimation = function(spider) {
     Effect.call(this);
     this.spider = spider;
@@ -1027,8 +1047,13 @@
         spider.addEffect(new CelebratingSpiderAnimation(spider));
       });
     },
-    this.showEndingScene: function() {
-      
+    showEndingScene: function() {
+      var sofaScene = new Quad(200, 200);
+      sofaScene.x = 300;
+      sofaScene.y = 550;
+      sofaScene.addEffect(new SofaSceneAnimation(sofaScene));
+      sofaScene.id = "sofascene";
+      this.scene.add(sofaScene);
     }
   };
   _.extend(ClosingStory.prototype, Eventable.prototype);
