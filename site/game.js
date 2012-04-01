@@ -412,8 +412,9 @@
       if(!this.visible) return;
 
       context.save();
-      context.translate(this.x, this.y);
+      context.translate(this.x + this.width / 2.0, this.y + this.height / 2.0);
       context.rotate(this.rotation);
+      context.translate(-this.width / 2.0, -this.height / 2.0)
       context.globalAlpha = this.alpha;
 
       if(this.colour instanceof Image)
@@ -519,7 +520,7 @@
     chooseGoodQuad: function() {
       var number = Math.floor(Math.random() * 8) + 1;
       this.colour = GlobalResources.getTexture('assets/goodfluff/hair-' + number + '.png');
-      this.addEffect(new ConstantRotationEffect(this, 0.01));
+      this.addEffect(new ConstantRotationEffect(this, (Math.random() * 0.5) - 0.25));
     },
     tick: function() {
       this.currentStrategy();
