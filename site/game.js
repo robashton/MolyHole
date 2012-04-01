@@ -231,6 +231,48 @@
   };
   _.extend(WaterfallAnimation.prototype, Effect.prototype);
 
+  var SaddenedSpiderAnimation = function(spider) {
+    Effect.call(this);
+    this.spider = spider;
+    this.tick = 0;
+    this.frame = 1;
+  };
+  SaddenedSpiderAnimation.prototype = {
+    update: function() {
+      this.selectFrame();
+      if(this.frame <= 4)
+        this.showFrame(this.frame);
+      else if (this.frame <= 8)
+        this.wibbleForFrame(this.frame);
+      else if (this.frame < 12)
+        this.unwindAnimationForFrame(this.frame)
+      else
+        this.end();
+    },
+    showFrame: function(frame) {
+      this.spider.colour = GlobalResources.getTexture('assets/spidersad/sad-' + frame + '.png');
+    },
+    wibbleForFrame: function(frame) {
+      var odd = frame % 2;
+      if(odd === 0)
+        this.showFrame(4)
+      else
+        this.showFrame(3);
+    },
+    unwindAnimationForFrame: function(frame) {
+      var unwound = (12 - frame);
+      this.showFrame(unwound); 
+    },
+    end: function() {
+      this.spider.resetAnimations();
+      this.raise('Finished');
+    },
+    selectFrame: function() {
+      if(this.tick++ % 5 == 0)
+        this.frame++; 
+    }
+  };
+  _.extend(SaddenedSpiderAnimation.prototype, Effect.prototype);
 
   var CelebratingSpiderAnimation = function(spider) {
     Effect.call(this);
@@ -269,6 +311,7 @@
       this.showFrame(unwound);
     },
     end: function() {
+      this.spider.resetAnimations()
       this.raise('Finished');
     },
   };
@@ -701,18 +744,26 @@
   _.extend(FloorWater.prototype, Quad.prototype);
 
   var Spider = function() {
-    Quad.call(this, 60, 60, GlobalResources.getTexture('assets/spiderstatic/staticspider.png'));
+    Quad.call(this, 60, 60);
     this.x = 730;
     this.y = 640;
     this.id = "spider";
+    this.resetAnimations();
   };
 
   Spider.prototype = {
     onAddedToScene: function() {
       this.scene.on('FluffSuccess', this.onFluffSuccess, this);
+      this.scene.on('FluffFailure', this.onFluffFailure, this);
     },
     onFluffSuccess: function() {
       this.addEffect(new CelebratingSpiderAnimation(this));
+    },
+    onFluffFailure: function() {
+      this.addEffect(new SaddenedSpiderAnimation(this));
+    },
+    resetAnimations: function() {
+      this.colour = GlobalResources.getTexture('assets/spiderstatic/staticspider.png');
     }
   };
   _.extend(Spider.prototype, Quad.prototype);
@@ -875,7 +926,6 @@
       this.scene.add(this.floorWater);
       this.scene.autoHook(this);
       this.startTimers();    
-      this.spider.addEffect(new CelebratingSpiderAnimation(this.spider));  
     },
     hookEntityEvents: function() {
       this.scene.on('TotalFluffChanged', this.onTotalFluffChanged, this);
