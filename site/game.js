@@ -324,6 +324,53 @@
   };
   _.extend(SaddenedSpiderAnimation.prototype, Effect.prototype);
 
+  var AngrySpiderAnimation = function(spider) {
+    Effect.call(this);
+    this.spider = spider;
+    this.tick = 0;
+    this.frame = 1;
+  };
+  AngrySpiderAnimation.prototype = {
+    update: function() {
+      this.selectFrame();
+      if(this.frame <= 3) {
+        this.showFrame(this.frame);
+      } else if(this.frame <= 13) {
+        this.beAngry(this.frame);
+      } else if(this.frame < 16) {
+        this.cheerUp(this.frame);
+      } else {
+        this.end();
+      }
+    },
+    selectFrame: function() {
+      if(this.tick++ % 5 === 0) {
+        this.frame++;
+      }
+    },
+    showFrame: function(frame) {
+      this.spider.colour = GlobalResources.getTexture('assets/spiderangry/angry-' + frame + '.png');
+    },
+    beAngry: function(frame) {
+      var odd = frame % 2;
+      if(odd === 0) {
+        this.showFrame(2);
+      }
+      else {
+        this.showFrame(3);
+      }
+    },
+    cheerUp: function(frame) {
+      var cheeringTime = (16 - frame);
+      this.showFrame(cheeringTime);
+    },
+    end: function() {
+      this.spider.resetAnimations()
+      this.raise('Finished');
+    }
+  };
+  _.extend(AngrySpiderAnimation.prototype, Effect.prototype);
+
   var CelebratingSpiderAnimation = function(spider) {
     Effect.call(this);
     this.spider = spider;
@@ -343,7 +390,7 @@
         this.end();
     },
     selectFrame: function() {
-      if(this.tick++ % 5 == 0)
+      if(this.tick++ % 5 === 0)
         this.frame++;
     },
     showFrame: function(frame) {
@@ -944,6 +991,7 @@
     this.speedx = 1.0;
     this.id = "spider";
     this.panicking = false;
+    this.animating = false;
     this.panickedAnimation = new PanickedSpiderAnimation(this);
     this.walkingAnimation = new WalkingSpiderAnimation(this);
     this.addEffect(this.walkingAnimation);
@@ -978,6 +1026,13 @@
       this.currentStrategy();
     },
     happyStrategy: function() {
+      this.walkTowardsTarget();
+      this.determineIfWaterIsHigh();
+      this.determineIfIntersectsWithWaterfall();      
+    },
+    walkTowardsTarget: function() {
+      if(this.animating) return;
+
       var difference = this.destx - (this.x + this.width / 2.0);
       if(Math.abs(difference) < 10)
         return this.chooseNewDirection();
@@ -985,7 +1040,6 @@
         this.x -= this.speedx;
       else
         this.x += this.speedx;
-      this.determineIfWaterIsHigh();
     },
     chooseNewDirection: function() {
       this.destx = (Math.random() * 700) + 50;
@@ -994,9 +1048,12 @@
       // Do bugger all
     },
     playNonDefaultAnimation: function(animation) {
+      if(this.animating) return;
       this.stopDefaultAnimation();
+      this.animating = true;
       animation.on('Finished', function() {
         this.startDefaultAnimation();
+        this.animating = false;
       }, this);
       this.addEffect(animation);
     },
@@ -1005,6 +1062,16 @@
     },
     stopDefaultAnimation: function() {
       this.walkingAnimation.disable();
+    },
+    determineIfIntersectsWithWaterfall: function() {
+      var self = this;
+      this.scene.withEntity("waterfall", function(waterfall) {
+        if(waterfall.intersects(self))
+          self.jumpAwayFromWaterfall();
+      });
+    },
+    jumpAwayFromWaterfall: function() {
+      this.playNonDefaultAnimation(new AngrySpiderAnimation(this));
     },
     determineIfWaterIsHigh: function() {
       var self = this;
